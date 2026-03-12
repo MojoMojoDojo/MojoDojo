@@ -1,0 +1,295 @@
+/* MojoDojo Brand Design System */
+
+:root {
+  /* Brand Colors - Premium Dark Palette */
+  --brand-black: #0a0a0a;
+  --brand-charcoal: #1a1a1a;
+  --brand-dark-gray: #2a2a2a;
+  --brand-gray: #4a4a4a;
+  --brand-light-gray: #9a9a9a;
+  --brand-off-white: #f5f5f0;
+  --brand-gold: #f4c430;
+  --brand-gold-dim: #d4a520;
+  --brand-gold-glow: rgba(244, 196, 48, 0.3);
+  --brand-gold-subtle: rgba(244, 196, 48, 0.1);
+  
+  /* Semantic Colors */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+}
+
+/* Global MojoDojo Styling */
+.mojodojo-app {
+  background: var(--brand-black);
+  color: var(--brand-off-white);
+  min-height: 100vh;
+}
+
+/* Golden Accent Elements */
+.gold-accent {
+  color: var(--brand-gold);
+}
+
+.gold-border {
+  border-color: var(--brand-gold);
+}
+
+.gold-bg {
+  background-color: var(--brand-gold);
+}
+
+.gold-glow {
+  box-shadow: 0 0 20px var(--brand-gold-glow);
+}
+
+.gold-underline {
+  border-bottom: 2px solid var(--brand-gold);
+}
+
+/* Premium Card Styling */
+.premium-card {
+  background: var(--brand-charcoal);
+  border: 1px solid rgba(244, 196, 48, 0.15);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.premium-card:hover {
+  border-color: var(--brand-gold);
+  box-shadow: 0 8px 32px rgba(244, 196, 48, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Glass Effect */
+.glass-effect {
+  background: rgba(26, 26, 26, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(244, 196, 48, 0.1);
+}
+
+/* Golden Line Motif - Signature Brand Device */
+.golden-line {
+  position: relative;
+}
+
+.golden-line::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(to bottom, transparent, var(--brand-gold), transparent);
+}
+
+.golden-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--brand-gold), transparent);
+}
+
+/* Hover States */
+.gold-hover-glow {
+  transition: all 0.3s ease;
+}
+
+.gold-hover-glow:hover {
+  color: var(--brand-gold);
+  text-shadow: 0 0 10px var(--brand-gold-glow);
+}
+
+/* Typography Enhancements */
+.premium-heading {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.elegant-text {
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.6;
+}
+
+/* Button Styles */
+.btn-primary-gold {
+  background: var(--brand-gold);
+  color: var(--brand-black);
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-primary-gold:hover {
+  background: var(--brand-gold-dim);
+  box-shadow: 0 0 20px var(--brand-gold-glow);
+  transform: translateY(-1px);
+}
+
+.btn-outline-gold {
+  background: transparent;
+  border: 2px solid var(--brand-gold);
+  color: var(--brand-gold);
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-outline-gold:hover {
+  background: var(--brand-gold);
+  color: var(--brand-black);
+  box-shadow: 0 0 20px var(--brand-gold-glow);
+}
+
+/* Status Badges */
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-available {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.status-pending {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.status-sold-out {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--brand-charcoal);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--brand-gray);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-gold);
+}
+
+/* Animations */
+@keyframes goldPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.animate-gold-pulse {
+  animation: goldPulse 2s ease-in-out infinite;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in-up {
+  animation: slideInUp 0.6s ease-out;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.shimmer-effect {
+  background: linear-gradient(
+    90deg,
+    var(--brand-charcoal) 0%,
+    var(--brand-dark-gray) 50%,
+    var(--brand-charcoal) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Animated gold border orbit for About Us image */
+@property --beam-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes goldBorderBeam {
+  to { --beam-angle: 360deg; }
+}
+
+.gold-border-beam-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  max-width: 28rem; /* max-w-md */
+  border-radius: 50%;
+  isolation: isolate;
+}
+
+.gold-border-beam-wrapper::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from var(--beam-angle),
+    transparent 0%,
+    transparent 72%,
+    rgba(244, 196, 48, 0.0) 76%,
+    rgba(244, 196, 48, 0.5) 80%,
+    rgba(244, 196, 48, 1.0) 82%,
+    rgba(244, 196, 48, 0.5) 84%,
+    rgba(244, 196, 48, 0.0) 88%,
+    transparent 92%
+  );
+  animation: goldBorderBeam 4s linear infinite;
+  mask: radial-gradient(
+    circle closest-side,
+    transparent 96%,
+    black 97%
+  );
+  -webkit-mask: radial-gradient(
+    circle closest-side,
+    transparent 96%,
+    black 97%
+  );
+}
+
+.gold-border-beam-wrapper img {
+  display: block;
+  width: 100%;
+  border-radius: 50%;
+  position: relative;
+  z-index: 1;
+}
