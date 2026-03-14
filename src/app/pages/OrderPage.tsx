@@ -1,32 +1,32 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Minus, ShoppingBag, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Minus, ShoppingBag, AlertTriangle } from 'lucide-react';
 import { api } from '../../lib/api';
 import type { Product } from '../../lib/supabase';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router';
 import { ProductDetailModal } from '../components/ProductDetailModal';
 import { useCart } from '../contexts/CartContext';
-import biscoffCheesecakeImage from '../../assets/BiscoffCheescake.png';
-import brownieCheesecakeImage from '../../assets/BrownieCheescake.png';
-import tiramisuTrayImage from '../../assets/TiramisuTray.png';
 import { useLanguage } from '../contexts/LanguageContext';
+import { getAllergenTags, getLocalizedProductDescription, getLocalizedProductName } from '../lib/productContent';
+import { getProductImage } from '../lib/productImages';
 
 export function OrderPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const { cart, addToCart, updateQuantity, total, itemCount } = useCart();
+  const { cart, updateQuantity, total, itemCount } = useCart();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
-  const productFallbackImages: Record<string, string> = {
-    prod_1: biscoffCheesecakeImage,
-    prod_2: brownieCheesecakeImage,
-    prod_3: tiramisuTrayImage,
-  };
-
-  const requiresDeposit = total > 100;
+  const cartProducts = products
+    .map(product => ({
+      product,
+      quantity: cart
+        .filter(item => item.product.id === product.id)
+        .reduce((sum, item) => sum + item.quantity, 0),
+    }))
+    .filter(entry => entry.quantity > 0);
 
   useEffect(() => {
     loadProducts();
@@ -42,16 +42,6 @@ export function OrderPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function getProductImage(product: Product) {
-    if (product.image_url) return product.image_url;
-    const name = product.name.toLowerCase();
-    if (productFallbackImages[product.id]) return productFallbackImages[product.id];
-    if (name.includes('biscoff') || name.includes('cheesecake')) return biscoffCheesecakeImage;
-    if (name.includes('brownie')) return brownieCheesecakeImage;
-    if (name.includes('tiramisu')) return tiramisuTrayImage;
-    return '';
   }
 
   return (
@@ -83,26 +73,6 @@ export function OrderPage() {
           )}
         </motion.div>
 
-        {/* Deposit Notice */}
-        <AnimatePresence>
-          {requiresDeposit && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="mb-8 p-4 bg-brand-gold-subtle border-2 border-brand-gold rounded-lg flex items-start gap-3"
-            >
-              <AlertCircle className="w-6 h-6 text-brand-gold flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-semibold text-brand-gold mb-1">{t.order.deposit.title}</h3>
-                <p className="text-sm text-gray-300">
-                  {t.order.deposit.description}
-                </p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* Product Grid */}
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -118,10 +88,10 @@ export function OrderPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {products.map(product => {
-              const cartItem = cart.find(item => item.product.id === product.id);
-              const quantity = cartItem?.quantity || 0;
               const productImage = getProductImage(product);
-              const hasAllergens = !!product.allergy_info;
+              const hasAllergens = getAllergenTags(product).length > 0;
+              const localizedName = getLocalizedProductName(product, language);
+              const localizedDescription = getLocalizedProductDescription(product, language);
 
               return (
                 <motion.div
@@ -138,7 +108,7 @@ export function OrderPage() {
                     {productImage ? (
                       <img
                         src={productImage}
-                        alt={product.name}
+                        alt={localizedName}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         onError={e => {
                           e.currentTarget.src =
@@ -157,7 +127,7 @@ export function OrderPage() {
                         className="absolute top-2 right-2 flex items-center gap-1.5
                                    bg-yellow-900/80 border border-yellow-500/60 rounded-full
                                    px-2 py-1.5 cursor-pointer overflow-hidden
-                                   max-w-[2rem] hover:max-w-[12rem]
+                                   max-w-[2rem] group-hover:max-w-[12rem] hover:max-w-[12rem]
                                    transition-[max-width] duration-300 ease-in-out"
                         onClick={e => { e.stopPropagation(); setSelectedProduct(product); }}
                       >
@@ -175,10 +145,10 @@ export function OrderPage() {
                       className="font-semibold text-lg mb-1 text-white cursor-pointer hover:text-brand-gold transition-colors"
                       onClick={() => setSelectedProduct(product)}
                     >
-                      {product.name}
+                      {localizedName}
                     </h3>
                     <p className="text-sm text-gray-400 mb-4 line-clamp-2">
-                      {product.description || 'Premium handcrafted dessert'}
+                      {localizedDescription || t.order.fallbackDescription}
                     </p>
 
                     <div className="flex items-center justify-between">
@@ -186,35 +156,13 @@ export function OrderPage() {
                         ${product.price.toFixed(2)}
                       </span>
 
-                      {/* Quantity Controls */}
-                      {quantity > 0 ? (
-                        <div className="flex items-center gap-2 bg-black border-2 border-brand-gold rounded-lg px-2 py-1">
-                          <button
-                            onClick={() => updateQuantity(product.id, -1)}
-                            className="w-7 h-7 flex items-center justify-center rounded bg-brand-gold text-brand-black hover:opacity-80 transition-opacity"
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-                          <span className="font-bold text-white w-5 text-center">{quantity}</span>
-                          <button
-                            onClick={() => updateQuantity(product.id, 1)}
-                            className="w-7 h-7 flex items-center justify-center rounded bg-brand-gold text-brand-black hover:opacity-80 transition-opacity"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            addToCart(product);
-                            toast.success(t.order.addedToCart(product.name));
-                          }}
-                          className="flex items-center gap-1.5 bg-brand-gold text-brand-black font-semibold py-2 px-4 rounded-lg hover:opacity-90 transition-all text-sm"
-                        >
-                          <Plus className="w-4 h-4" />
-                          {t.order.addToCart}
-                        </button>
-                      )}
+                      <button
+                        onClick={() => setSelectedProduct(product)}
+                        className="flex items-center gap-1.5 bg-brand-gold text-brand-black font-semibold py-2 px-4 rounded-lg hover:opacity-90 transition-all text-sm"
+                      >
+                        <Plus className="w-4 h-4" />
+                        {t.order.viewDetails}
+                      </button>
                     </div>
                   </div>
                 </motion.div>
@@ -233,35 +181,63 @@ export function OrderPage() {
             exit={{ y: 100, opacity: 0 }}
             className="fixed bottom-0 left-0 right-0 z-40 glass-effect border-t border-brand-gold/30"
           >
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <ShoppingBag className="w-6 h-6 text-brand-gold" />
-                  <span className="absolute -top-2 -right-2 bg-brand-gold text-brand-black text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                    {itemCount}
-                  </span>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex flex-col gap-3 min-w-0 flex-1">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <ShoppingBag className="w-6 h-6 text-brand-gold" />
+                    <span className="absolute -top-2 -right-2 bg-brand-gold text-brand-black text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                      {itemCount}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm text-brand-light-gray">
+                      {t.order.items(itemCount)}
+                    </p>
+                    <p className="font-bold text-brand-gold text-lg">${total.toFixed(2)}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-brand-light-gray">
-                    {t.order.items(itemCount)}
-                  </p>
-                  <p className="font-bold text-brand-gold text-lg">${total.toFixed(2)}</p>
-                </div>
+
+                {cartProducts.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {cartProducts.map(({ product, quantity }) => (
+                      <div
+                        key={product.id}
+                        className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-black/40 px-2.5 py-1.5 flex-shrink-0"
+                      >
+                        <span className="text-xs text-gray-200 max-w-[110px] truncate">
+                          {getLocalizedProductName(product, language)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(product.id, -1)}
+                          className="w-5 h-5 flex items-center justify-center rounded bg-zinc-700 text-white hover:bg-brand-gold hover:text-brand-black transition-all"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="text-xs font-semibold text-white min-w-4 text-center">{quantity}</span>
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(product.id, 1)}
+                          className="w-5 h-5 flex items-center justify-center rounded bg-zinc-700 text-white hover:bg-brand-gold hover:text-brand-black transition-all"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {requiresDeposit && (
-                <p className="hidden sm:block text-xs text-yellow-400">
-                  {t.order.deposit.cartNote}
-                </p>
-              )}
-
-              <button
-                onClick={() => navigate('/checkout')}
-                className="bg-brand-gold text-brand-black font-semibold flex items-center gap-2 px-6 py-3 rounded-lg hover:opacity-90 transition-all text-sm flex-shrink-0"
-              >
-                <ShoppingBag className="w-4 h-4" />
-                {t.order.proceedToCheckout}
-              </button>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => navigate('/checkout')}
+                  className="bg-brand-gold text-brand-black font-semibold flex items-center gap-2 px-6 py-3 rounded-lg hover:opacity-90 transition-all text-sm flex-shrink-0"
+                >
+                  <ShoppingBag className="w-4 h-4" />
+                  {t.order.proceedToCheckout}
+                </button>
+              </div>
             </div>
           </motion.div>
         )}

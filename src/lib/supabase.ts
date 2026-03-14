@@ -18,13 +18,18 @@ export interface User {
 export interface Product {
   id: string;
   name: string;
+  name_fr?: string;
   description: string;
+  description_fr?: string;
   price: number;
   image_url?: string;
   status: 'available' | 'low_stock' | 'preorder' | 'sold_out';
   category?: string;
+  category_fr?: string;
   serving_size?: string;
+  serving_size_fr?: string;
   allergy_info?: string;
+  allergy_info_fr?: string;
   visible: boolean;
   created_at: string;
 }
@@ -34,10 +39,21 @@ export interface Order {
   customer_name: string;
   customer_email: string;
   customer_phone: string;
-  status: 'pending' | 'confirmed' | 'in_preparation' | 'completed' | 'cancelled';
+  status:
+    | 'request_received'
+    | 'under_review'
+    | 'accepted'
+    | 'rejected'
+    | 'ready_for_pickup'
+    | 'out_for_delivery'
+    | 'completed'
+    | 'pending'
+    | 'confirmed'
+    | 'in_preparation'
+    | 'cancelled';
   total: number;
-  payment_method: 'cash' | 'online';
-  payment_status: 'pending' | 'paid';
+  payment_method?: 'cash' | 'etranser' | 'arranged_after_approval' | 'online';
+  payment_status?: 'pending' | 'paid' | 'arranged';
   delivery_type: 'pickup' | 'delivery';
   delivery_address?: string;
   preferred_datetime?: string;
@@ -52,6 +68,14 @@ export interface OrderItem {
   product_name: string;
   quantity: number;
   price: number;
+  customization?: {
+    preparationOptionId?: string;
+    premiumAddOnId?: string;
+    dietaryOptionId?: string;
+    alcoholChoiceId?: string;
+    pureAlcoholMl?: number;
+    estimatedFinalAbvPercent?: number;
+  };
 }
 
 export interface Ingredient {

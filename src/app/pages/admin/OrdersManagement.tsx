@@ -11,7 +11,21 @@ import {
   SelectValue,
 } from '../../components/ui/select';
 import { toast } from 'sonner';
-import { Eye, Loader2 } from 'lucide-react';
+
+const STATUS_LABELS: Record<string, string> = {
+  all: 'All',
+  request_received: 'Request received',
+  under_review: 'Under review',
+  accepted: 'Accepted',
+  rejected: 'Rejected',
+  ready_for_pickup: 'Ready for pickup',
+  out_for_delivery: 'Out for delivery',
+  completed: 'Completed',
+  pending: 'Pending (legacy)',
+  confirmed: 'Confirmed (legacy)',
+  in_preparation: 'In preparation (legacy)',
+  cancelled: 'Cancelled (legacy)',
+};
 
 export function OrdersManagement() {
   const { accessToken } = useAuth();
@@ -64,17 +78,30 @@ export function OrdersManagement() {
 
       {/* Filters */}
       <div className="flex gap-4">
-        {['all', 'pending', 'confirmed', 'in_preparation', 'completed', 'cancelled'].map((status) => (
+        {[
+          'all',
+          'request_received',
+          'under_review',
+          'accepted',
+          'rejected',
+          'ready_for_pickup',
+          'out_for_delivery',
+          'completed',
+          'pending',
+          'confirmed',
+          'in_preparation',
+          'cancelled',
+        ].map((status) => (
           <button
             key={status}
             onClick={() => setFilter(status)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all capitalize ${
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               filter === status
                 ? 'bg-brand-gold text-brand-black'
                 : 'bg-brand-dark-gray text-brand-light-gray hover:bg-brand-gray hover:text-brand-gold'
             }`}
           >
-            {status.replace('_', ' ')}
+            {STATUS_LABELS[status] ?? status}
           </button>
         ))}
       </div>
@@ -119,7 +146,7 @@ export function OrdersManagement() {
                   </div>
                   <div>
                     <span className="text-brand-light-gray">Payment:</span>{' '}
-                    <span className="capitalize">{order.payment_method}</span>
+                    <span className="capitalize">{order.payment_method ?? 'arranged_after_approval'}</span>
                   </div>
                   {order.delivery_address && (
                     <div className="md:col-span-2">
@@ -155,20 +182,26 @@ export function OrdersManagement() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-brand-charcoal border-brand-dark-gray text-brand-off-white">
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="confirmed">Confirmed</SelectItem>
-                      <SelectItem value="in_preparation">In Preparation</SelectItem>
+                      <SelectItem value="request_received">Request received</SelectItem>
+                      <SelectItem value="under_review">Under review</SelectItem>
+                      <SelectItem value="accepted">Accepted</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                      <SelectItem value="ready_for_pickup">Ready for pickup</SelectItem>
+                      <SelectItem value="out_for_delivery">Out for delivery</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="pending">Pending (legacy)</SelectItem>
+                      <SelectItem value="confirmed">Confirmed (legacy)</SelectItem>
+                      <SelectItem value="in_preparation">In preparation (legacy)</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
 
                   <div className={`status-badge ${
-                    order.status === 'pending' ? 'status-pending' :
+                    ['request_received', 'under_review', 'pending'].includes(order.status) ? 'status-pending' :
                     order.status === 'completed' ? 'status-available' :
                     'status-pending'
                   }`}>
-                    {order.status.replace('_', ' ')}
+                    {STATUS_LABELS[order.status] ?? order.status.replace('_', ' ')}
                   </div>
                 </div>
               </div>

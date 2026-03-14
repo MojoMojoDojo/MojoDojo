@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
@@ -74,12 +75,17 @@ app.post("/make-server-44229999/init", async (c) => {
       {
         id: 'prod_1',
         name: 'Biscoff Cheesecake',
+        name_fr: 'Gateau au fromage Biscoff',
         description: 'Rich and creamy cheesecake with a Biscoff cookie crust, topped with caramelized Biscoff spread and cookie crumbles.',
+        description_fr: 'Gateau au fromage onctueux sur croute biscuit Biscoff, avec garniture caramelisee et miettes croustillantes.',
         price: 15,
         status: 'available',
         category: 'cheesecake',
+        category_fr: 'gateau au fromage',
         serving_size: 'Individual slice',
+        serving_size_fr: 'portion individuelle',
         allergy_info: 'Contains dairy, gluten, eggs',
+        allergy_info_fr: 'Contient produits laitiers, gluten, oeufs',
         visible: true,
         image: 'figma:asset/312145bbab9fac96704a41479c65000c211ca1ae.png',
         created_at: new Date().toISOString()
@@ -87,12 +93,17 @@ app.post("/make-server-44229999/init", async (c) => {
       {
         id: 'prod_2',
         name: 'Cheesecake Brownie Tray',
+        name_fr: 'Plateau brownie au fromage',
         description: 'Decadent fudgy brownies swirled with velvety cheesecake, perfect for sharing or special occasions.',
+        description_fr: 'Brownies fondants marbres de creme au fromage, parfaits pour partager.',
         price: 25,
         status: 'available',
         category: 'tray',
+        category_fr: 'dessert en plateau',
         serving_size: '12 pieces',
+        serving_size_fr: '12 morceaux',
         allergy_info: 'Contains dairy, gluten, eggs',
+        allergy_info_fr: 'Contient produits laitiers, gluten, oeufs',
         visible: true,
         image: 'figma:asset/6b391ecc945330641db08e507f7e8ec764998797.png',
         created_at: new Date().toISOString()
@@ -100,12 +111,17 @@ app.post("/make-server-44229999/init", async (c) => {
       {
         id: 'prod_3',
         name: 'Tiramisu Tray',
+        name_fr: 'Plateau tiramisu',
         description: 'Classic Italian dessert with layers of coffee-soaked ladyfingers and mascarpone cream, dusted with cocoa.',
+        description_fr: 'Dessert italien classique avec biscuits imbibes de cafe, creme mascarpone et cacao.',
         price: 25,
         status: 'available',
         category: 'tray',
+        category_fr: 'dessert en plateau',
         serving_size: '12 pieces',
+        serving_size_fr: '12 morceaux',
         allergy_info: 'Contains dairy, gluten, eggs, caffeine',
+        allergy_info_fr: 'Contient produits laitiers, gluten, oeufs, cafeine',
         visible: true,
         image: 'figma:asset/13cfadf2c294768554cdffe4f2a29ea4ea2a9a32.png',
         created_at: new Date().toISOString()
@@ -306,8 +322,9 @@ app.post("/make-server-44229999/orders", async (c) => {
     const order = {
       ...body,
       id: orderId,
-      status: 'pending',
-      payment_status: body.payment_method === 'cash' ? 'pending' : 'pending',
+      status: body.status || 'request_received',
+      payment_method: body.payment_method || 'arranged_after_approval',
+      payment_status: body.payment_status || 'arranged',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };

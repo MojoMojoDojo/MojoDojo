@@ -35,7 +35,7 @@ export function AdminDashboard() {
 
   const stats = {
     totalOrders: orders.length,
-    pendingOrders: orders.filter(o => o.status === 'pending').length,
+    pendingOrders: orders.filter(o => ['request_received', 'under_review', 'pending'].includes(o.status)).length,
     completedOrders: orders.filter(o => o.status === 'completed').length,
     totalRevenue: orders
       .filter(o => o.status === 'completed')
@@ -146,7 +146,7 @@ export function AdminDashboard() {
                   </p>
                 </div>
                 <div className={`status-badge ${
-                  order.status === 'pending' ? 'status-pending' :
+                  ['request_received', 'under_review', 'pending'].includes(order.status) ? 'status-pending' :
                   order.status === 'completed' ? 'status-available' :
                   'status-pending'
                 }`}>

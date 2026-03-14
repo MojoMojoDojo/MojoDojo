@@ -1,29 +1,97 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, Loader2, ShoppingBag, AlertCircle, Trash2, ArrowLeft, Plus, Minus } from 'lucide-react';
+import { Check, Loader2, ShoppingBag, Trash2, ArrowLeft, Plus, Minus, CalendarClock, CalendarDays } from 'lucide-react';
+import { format, isValid, parse } from 'date-fns';
 import { api } from '../../lib/api';
 import { useCart } from '../contexts/CartContext';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useLanguage } from '../contexts/LanguageContext';
+import { resolveCustomization } from '@/app/lib/productCustomization';
+import { getLocalizedProductName } from '../lib/productContent';
+import { Calendar } from '../components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+
+function formatDateDigits(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  const parts = [digits.slice(0, 4), digits.slice(4, 6), digits.slice(6, 8)].filter(Boolean);
+  return parts.join('/');
+}
+
+function parseDateInput(value: string): Date | undefined {
+  if (!/^\d{4}\/\d{2}\/\d{2}$/.test(value)) return undefined;
+  const parsed = parse(value, 'yyyy/MM/dd', new Date());
+  if (!isValid(parsed)) return undefined;
+  return format(parsed, 'yyyy/MM/dd') === value ? parsed : undefined;
+}
+
+const HOUR_OPTIONS = Array.from({ length: 13 }, (_, index) => {
+  const hour24 = 8 + index;
+  const hour12 = hour24 > 12 ? hour24 - 12 : hour24;
+  const period = hour24 >= 12 ? 'PM' : 'AM';
+  return {
+    value: `${String(hour24).padStart(2, '0')}:00`,
+    label: `${hour12}:00 ${period}`,
+  };
+});
 
 export function CheckoutPage() {
   const { cart, updateQuantity, removeFromCart, clearCart, total, itemCount } = useCart();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
-  const { t } = useLanguage();
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [pendingRemovalItemId, setPendingRemovalItemId] = useState<string | null>(null);
+  const { t, language } = useLanguage();
 
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryType, setDeliveryType] = useState<'pickup' | 'delivery'>('pickup');
   const [deliveryAddress, setDeliveryAddress] = useState('');
-  const [preferredDatetime, setPreferredDatetime] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online'>('cash');
+  const [preferredDateInput, setPreferredDateInput] = useState('');
+  const [preferredTime, setPreferredTime] = useState('');
   const [notes, setNotes] = useState('');
 
-  const requiresDeposit = total > 100;
+  const selectedDate = useMemo(() => parseDateInput(preferredDateInput), [preferredDateInput]);
+  const today = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return now;
+  }, []);
+
+  function buildPreferredDatetime(): string | undefined {
+    if (!selectedDate || !preferredTime) return undefined;
+    return `${format(selectedDate, 'yyyy/MM/dd')} ${preferredTime}`;
+  }
+
+  function validatePreferredDatetime(): boolean {
+    if (!preferredDateInput.trim() || !preferredTime.trim()) {
+      toast.error(t.checkout.fillPreferredDateTime);
+      return false;
+    }
+
+    if (!selectedDate) {
+      toast.error(t.checkout.invalidPreferredDate);
+      return false;
+    }
+
+    const [hours, minutes] = preferredTime.split(':').map(Number);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+      toast.error(t.checkout.invalidPreferredDateTime);
+      return false;
+    }
+
+    const requested = new Date(selectedDate);
+    requested.setHours(hours, minutes, 0, 0);
+
+    if (requested.getTime() < Date.now()) {
+      toast.error(t.checkout.invalidPreferredDateTime);
+      return false;
+    }
+
+    return true;
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,6 +106,8 @@ export function CheckoutPage() {
       return;
     }
 
+    if (!validatePreferredDatetime()) return;
+
     setSubmitting(true);
     try {
       await api.orders.create({
@@ -46,15 +116,17 @@ export function CheckoutPage() {
         customer_phone: customerPhone,
         delivery_type: deliveryType,
         delivery_address: deliveryType === 'delivery' ? deliveryAddress : undefined,
-        preferred_datetime: preferredDatetime || undefined,
-        payment_method: paymentMethod,
+        preferred_datetime: buildPreferredDatetime(),
+        payment_method: 'arranged_after_approval',
         notes: notes || undefined,
         total,
+        status: 'request_received',
         items: cart.map(item => ({
           product_id: item.product.id,
-          product_name: item.product.name,
+          product_name: getLocalizedProductName(item.product, language),
           quantity: item.quantity,
-          price: item.product.price,
+          price: item.unitPrice,
+          customization: item.customization,
         })),
       });
 
@@ -62,7 +134,7 @@ export function CheckoutPage() {
       setOrderPlaced(true);
       toast.success(t.checkout.orderSuccess);
     } catch (error) {
-      console.error('Failed to place order:', error);
+      console.error('Failed to submit order request:', error);
       toast.error(t.checkout.orderFailed);
     } finally {
       setSubmitting(false);
@@ -83,14 +155,11 @@ export function CheckoutPage() {
           <h1 className="text-4xl font-bold mb-4 premium-heading">
             <span className="gold-accent">{t.checkout.success.title}</span>
           </h1>
-          <p className="text-lg text-brand-light-gray elegant-text mb-4">
-            {t.checkout.success.message}
-          </p>
-          {requiresDeposit && (
-            <p className="text-brand-gold font-semibold mb-8">
-              {t.checkout.success.depositNote}
-            </p>
-          )}
+          <p className="text-lg text-brand-light-gray elegant-text mb-6">{t.checkout.success.message}</p>
+          <div className="rounded-xl border border-zinc-700 bg-zinc-900/60 p-4 text-sm text-gray-200 mb-8">
+            <p>{t.checkout.success.emailStep1}</p>
+            <p className="mt-2">{t.checkout.success.emailStep2}</p>
+          </div>
           <button
             onClick={() => navigate('/')}
             className="bg-brand-gold text-brand-black font-semibold px-8 py-3 rounded-lg hover:opacity-90 transition-all"
@@ -141,15 +210,12 @@ export function CheckoutPage() {
           </button>
 
           <h1 className="text-4xl md:text-5xl font-bold premium-heading">
-            {t.checkout.title}{' '}<span className="gold-accent">{t.checkout.titleAccent}</span>
+            {t.checkout.title} <span className="gold-accent">{t.checkout.titleAccent}</span>
           </h1>
-          <p className="text-lg text-brand-light-gray elegant-text mt-2">
-            {t.checkout.subtitle}
-          </p>
+          <p className="text-lg text-brand-light-gray elegant-text mt-2">{t.checkout.subtitle}</p>
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          {/* Order Form */}
           <div className="lg:col-span-3">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="premium-card p-6 space-y-5">
@@ -200,7 +266,7 @@ export function CheckoutPage() {
               </div>
 
               <div className="premium-card p-6 space-y-5">
-                <h2 className="text-xl font-semibold text-white">{t.checkout.delivery}</h2>
+                <h2 className="text-xl font-semibold text-white">{t.checkout.fulfillment}</h2>
 
                 <div className="grid grid-cols-2 gap-3">
                   {([
@@ -244,46 +310,85 @@ export function CheckoutPage() {
                   )}
                 </AnimatePresence>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                    {t.checkout.preferredDateTime}
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-gray-300 mb-0.5">
+                    {t.checkout.preferredDateTime} <span className="text-brand-gold">*</span>
                   </label>
-                  <input
-                    type="datetime-local"
-                    value={preferredDatetime}
-                    onChange={e => setPreferredDatetime(e.target.value)}
-                    className="w-full bg-black border-2 border-zinc-700 text-white rounded-lg px-4 py-2.5 focus:border-brand-gold focus:outline-none transition-colors"
-                  />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_160px] gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">{t.checkout.preferredDate}</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={preferredDateInput}
+                          onChange={e => setPreferredDateInput(formatDateDigits(e.target.value))}
+                          placeholder={t.checkout.preferredDatePlaceholder}
+                          className="w-full bg-black border-2 border-zinc-700 text-white rounded-lg px-4 pr-12 py-2.5 focus:border-brand-gold focus:outline-none transition-colors"
+                        />
+                        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={t.checkout.openCalendar}
+                              className="absolute inset-y-0 right-0 px-3 text-gray-400 hover:text-brand-gold transition-colors"
+                            >
+                              <CalendarDays className="w-4 h-4" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" className="w-auto p-0 bg-zinc-950 border-zinc-700 text-white">
+                            <Calendar
+                              mode="single"
+                              selected={selectedDate}
+                              onSelect={(date) => {
+                                if (!date) return;
+                                setPreferredDateInput(format(date, 'yyyy/MM/dd'));
+                                setCalendarOpen(false);
+                              }}
+                              disabled={(date) => date < today}
+                              className="text-white"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">{t.checkout.preferredTime}</label>
+                      <select
+                        value={preferredTime}
+                        onChange={e => setPreferredTime(e.target.value)}
+                        className="w-full bg-black border-2 border-zinc-700 text-white rounded-lg px-4 py-2.5 focus:border-brand-gold focus:outline-none transition-colors"
+                      >
+                        <option value="" className="bg-zinc-900 text-gray-400">
+                          {t.checkout.preferredTimePlaceholder}
+                        </option>
+                        {HOUR_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value} className="bg-zinc-900 text-white">
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div className="premium-card p-6 space-y-5">
-                <h2 className="text-xl font-semibold text-white">{t.checkout.paymentMethod}</h2>
+                <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                  <CalendarClock className="w-5 h-5 text-brand-gold" />
+                  {t.checkout.paymentAndApproval}
+                </h2>
 
-                <div className="grid grid-cols-2 gap-3">
-                  {([
-                    { value: 'cash' as const, label: t.checkout.cash },
-                    { value: 'online' as const, label: t.checkout.online },
-                  ]).map(({ value, label }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setPaymentMethod(value)}
-                      className={`p-3 rounded-lg border-2 font-medium transition-all ${
-                        paymentMethod === value
-                          ? 'bg-brand-gold border-brand-gold text-brand-black'
-                          : 'bg-zinc-900 border-zinc-700 text-white hover:border-zinc-500'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                <div className="rounded-xl border border-zinc-700 bg-black/30 p-4 space-y-2 text-sm text-gray-200">
+                  <p>{t.checkout.paymentInfoLine1}</p>
+                  <p>{t.checkout.paymentInfoLine2}</p>
+                  <p>{t.checkout.paymentInfoLine3}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                    {t.checkout.instructions}
-                  </label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1.5">{t.checkout.instructions}</label>
                   <textarea
                     value={notes}
                     onChange={e => setNotes(e.target.value)}
@@ -302,25 +407,18 @@ export function CheckoutPage() {
                 {submitting ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    {t.checkout.placingOrder}
+                    {t.checkout.submittingRequest}
                   </>
                 ) : (
                   <>
                     <Check className="w-5 h-5" />
-                    {t.checkout.placeOrder} — ${total.toFixed(2)}
+                    {t.checkout.submitOrderRequest} - ${total.toFixed(2)}
                   </>
                 )}
               </button>
-
-              {requiresDeposit && (
-                <p className="text-xs text-gray-400 text-center">
-                  {t.checkout.depositNote}
-                </p>
-              )}
             </form>
           </div>
 
-          {/* Cart Summary */}
           <div className="lg:col-span-2">
             <div className="sticky top-24">
               <div className="premium-card p-6">
@@ -330,46 +428,67 @@ export function CheckoutPage() {
                 </h2>
 
                 <div className="space-y-3 mb-5">
-                  {cart.map(item => (
-                    <div
-                      key={item.product.id}
-                      className="flex items-start gap-3 bg-zinc-900 p-3 rounded-lg border border-zinc-800"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-white text-sm truncate">{item.product.name}</p>
-                        <p className="text-gray-400 text-xs mt-0.5">${item.product.price.toFixed(2)} {t.checkout.each}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <button
-                            type="button"
-                            onClick={() => updateQuantity(item.product.id, -1)}
-                            className="w-6 h-6 flex items-center justify-center rounded bg-zinc-700 hover:bg-brand-gold hover:text-brand-black transition-all"
-                          >
-                            <Minus className="w-3 h-3" />
-                          </button>
-                          <span className="text-white text-sm font-semibold w-4 text-center">{item.quantity}</span>
-                          <button
-                            type="button"
-                            onClick={() => updateQuantity(item.product.id, 1)}
-                            className="w-6 h-6 flex items-center justify-center rounded bg-zinc-700 hover:bg-brand-gold hover:text-brand-black transition-all"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
+                  {cart.map(item => {
+                    const selected = resolveCustomization(item.product, {
+                      preparationOptionId: item.customization.preparationOptionId ?? item.customization.dietaryOptionId,
+                      premiumAddOnId: item.customization.premiumAddOnId ?? item.customization.alcoholChoiceId,
+                    });
+
+                    return (
+                      <div key={item.id} className="flex items-start gap-3 bg-zinc-900 p-3 rounded-lg border border-zinc-800">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-white text-sm truncate">{getLocalizedProductName(item.product, language)}</p>
+                          <p className="text-gray-400 text-xs mt-0.5">${item.unitPrice.toFixed(2)} {t.checkout.each}</p>
+                          {selected.premiumAddOn && (
+                            <p className="text-gray-500 text-xs mt-0.5">
+                              {t.order.options[selected.premiumAddOn.labelKey as keyof typeof t.order.options]}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 mt-2">
+                            <button
+                              type="button"
+                              onClick={() => updateQuantity(item.id, -1)}
+                              className="w-6 h-6 flex items-center justify-center rounded bg-zinc-700 hover:bg-brand-gold hover:text-brand-black transition-all"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <span className="text-white text-sm font-semibold w-4 text-center">{item.quantity}</span>
+                            <button
+                              type="button"
+                              onClick={() => updateQuantity(item.id, 1)}
+                              className="w-6 h-6 flex items-center justify-center rounded bg-zinc-700 hover:bg-brand-gold hover:text-brand-black transition-all"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-2 min-w-[72px]">
+                          <span className="font-bold text-brand-gold text-sm">${(item.unitPrice * item.quantity).toFixed(2)}</span>
+                          {pendingRemovalItemId === item.id ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                removeFromCart(item.id);
+                                setPendingRemovalItemId(null);
+                              }}
+                              className="text-xs text-red-300 hover:text-red-200 transition-colors"
+                            >
+                              {t.checkout.confirmRemove}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setPendingRemovalItemId(item.id)}
+                              className="text-gray-500 hover:text-red-400 transition-colors"
+                              aria-label={t.checkout.removeItem}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <span className="font-bold text-brand-gold text-sm">
-                          ${(item.product.price * item.quantity).toFixed(2)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeFromCart(item.product.id)}
-                          className="text-gray-500 hover:text-red-400 transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="border-t-2 border-zinc-800 pt-4 space-y-3">
@@ -377,22 +496,6 @@ export function CheckoutPage() {
                     <span className="text-gray-400">{t.checkout.subtotal(itemCount)}</span>
                     <span className="font-semibold text-white">${total.toFixed(2)}</span>
                   </div>
-
-                  <AnimatePresence>
-                    {requiresDeposit && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="flex items-start gap-2 bg-brand-gold-subtle border border-brand-gold/50 rounded-lg p-3"
-                      >
-                        <AlertCircle className="w-4 h-4 text-brand-gold flex-shrink-0 mt-0.5" />
-                        <p className="text-xs text-brand-gold">
-                          {t.checkout.depositCartNote}
-                        </p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
 
                   <div className="flex justify-between items-center pt-1">
                     <span className="font-bold text-lg text-white">{t.checkout.total}</span>

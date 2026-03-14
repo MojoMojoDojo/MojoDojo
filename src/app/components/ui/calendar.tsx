@@ -23,10 +23,8 @@ function Calendar({
         caption: "flex justify-center pt-1 relative items-center w-full",
         caption_label: "text-sm font-medium",
         nav: "flex items-center gap-1",
-        nav_button: cn(
-          buttonVariants({ variant: "outline" }),
-          "size-7 bg-transparent p-0 opacity-50 hover:opacity-100",
-        ),
+        nav_button:
+          "size-7 p-0 bg-transparent border-0 text-white opacity-100 hover:opacity-100 hover:text-white rounded-none shadow-none focus-visible:ring-0",
         nav_button_previous: "absolute left-1",
         nav_button_next: "absolute right-1",
         table: "w-full border-collapse space-x-1",
