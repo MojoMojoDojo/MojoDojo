@@ -3,8 +3,10 @@ import { ImageWithFallback } from '../components/shared/ImageWithFallback';
 import biscoffCheesecakeImage from '../../assets/BiscoffCheescake.png';
 import brownieCheesecakeImage from '../../assets/BrownieCheescake.png';
 import tiramisuTrayImage from '../../assets/TiramisuTray.png';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export function GalleryPage() {
+  const { t } = useLanguage();
   const galleryItems = [
     { id: 1, category: 'product', url: biscoffCheesecakeImage, caption: 'Biscoff Cheesecake' },
     { id: 2, category: 'product', url: brownieCheesecakeImage, caption: 'Brownie Cheesecake Tray' },
@@ -22,10 +24,10 @@ export function GalleryPage() {
             className="text-center max-w-4xl mx-auto mb-12"
           >
             <h1 className="text-5xl md:text-6xl font-bold mb-6 premium-heading">
-              Our <span className="gold-accent">Gallery</span>
+              {t.gallery.title} <span className="gold-accent">{t.gallery.titleAccent}</span>
             </h1>
             <p className="text-xl text-brand-light-gray elegant-text">
-              A visual journey through our premium desserts and creations
+              {t.gallery.subtitle}
             </p>
           </motion.div>
 

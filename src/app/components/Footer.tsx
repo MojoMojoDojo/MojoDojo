@@ -1,8 +1,10 @@
 import { Link } from 'react-router';
 import { Instagram, Mail, MapPin, Phone } from 'lucide-react';
 import logoImage from '../../assets/MojoDojoLogo.png';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export function Footer() {
+  const { t } = useLanguage();
   return (
     <footer className="bg-brand-black border-t border-brand-dark-gray">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -14,7 +16,7 @@ export function Footer() {
               <span className="text-xl font-bold gold-accent">MojoDojo</span>
             </div>
             <p className="text-sm text-brand-light-gray elegant-text">
-              Premium desserts crafted with discipline, precision, and passion.
+              {t.footer.tagline}
             </p>
             <div className="flex gap-4">
               <a
@@ -36,26 +38,26 @@ export function Footer() {
 
           {/* Quick Links */}
           <div>
-            <h4 className="font-semibold text-brand-off-white mb-4">Quick Links</h4>
+            <h4 className="font-semibold text-brand-off-white mb-4">{t.footer.quickLinks}</h4>
             <ul className="space-y-2">
               <li>
                 <Link to="/about" className="text-sm text-brand-light-gray hover:text-brand-gold transition-colors">
-                  About Us
+                  {t.footer.links.about}
                 </Link>
               </li>
               <li>
                 <Link to="/reviews" className="text-sm text-brand-light-gray hover:text-brand-gold transition-colors">
-                  Reviews
+                  {t.footer.links.reviews}
                 </Link>
               </li>
               <li>
                 <Link to="/order" className="text-sm text-brand-light-gray hover:text-brand-gold transition-colors">
-                  Order Now
+                  {t.footer.links.order}
                 </Link>
               </li>
               <li>
                 <Link to="/faq" className="text-sm text-brand-light-gray hover:text-brand-gold transition-colors">
-                  FAQ
+                  {t.footer.links.faq}
                 </Link>
               </li>
             </ul>
@@ -63,26 +65,26 @@ export function Footer() {
 
           {/* Support */}
           <div>
-            <h4 className="font-semibold text-brand-off-white mb-4">Support</h4>
+            <h4 className="font-semibold text-brand-off-white mb-4">{t.footer.support}</h4>
             <ul className="space-y-2">
               <li>
                 <Link to="/faq" className="text-sm text-brand-light-gray hover:text-brand-gold transition-colors">
-                  FAQ
+                  {t.footer.links.faq}
                 </Link>
               </li>
               <li>
                 <Link to="/contact" className="text-sm text-brand-light-gray hover:text-brand-gold transition-colors">
-                  Contact
+                  {t.footer.links.contact}
                 </Link>
               </li>
               <li>
                 <Link to="/privacy" className="text-sm text-brand-light-gray hover:text-brand-gold transition-colors">
-                  Privacy Policy
+                  {t.footer.links.privacy}
                 </Link>
               </li>
               <li>
                 <Link to="/terms" className="text-sm text-brand-light-gray hover:text-brand-gold transition-colors">
-                  Terms of Service
+                  {t.footer.links.terms}
                 </Link>
               </li>
             </ul>
@@ -90,11 +92,11 @@ export function Footer() {
 
           {/* Contact Info */}
           <div>
-            <h4 className="font-semibold text-brand-off-white mb-4">Get in Touch</h4>
+            <h4 className="font-semibold text-brand-off-white mb-4">{t.footer.getInTouch}</h4>
             <ul className="space-y-3">
               <li className="flex items-start gap-2 text-sm text-brand-light-gray">
                 <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-brand-gold" />
-                <span>Montreal & Laval, Quebec</span>
+                <span>{t.footer.location}</span>
               </li>
               <li className="flex items-start gap-2 text-sm text-brand-light-gray">
                 <Mail className="w-4 h-4 mt-0.5 flex-shrink-0 text-brand-gold" />
@@ -104,7 +106,7 @@ export function Footer() {
               </li>
               <li className="flex items-start gap-2 text-sm text-brand-light-gray">
                 <Phone className="w-4 h-4 mt-0.5 flex-shrink-0 text-brand-gold" />
-                <span>Available for orders</span>
+                <span>{t.footer.available}</span>
               </li>
             </ul>
           </div>
@@ -113,7 +115,7 @@ export function Footer() {
         <div className="golden-divider my-8"></div>
 
         <div className="text-center text-sm text-brand-light-gray">
-          <p>© {new Date().getFullYear()} MojoDojo. All rights reserved. Crafted with discipline.</p>
+          <p>{t.footer.copyright(new Date().getFullYear())}</p>
         </div>
       </div>
     </footer>

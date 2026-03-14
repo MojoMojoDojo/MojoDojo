@@ -5,10 +5,12 @@ import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import type { Product } from '../../lib/supabase';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const { t } = useLanguage();
 
   useEffect(() => {
     loadProducts();
@@ -56,14 +58,13 @@ export function HomePage() {
             transition={{ duration: 0.8 }}
           >
             <h1 className="text-5xl md:text-7xl font-bold mb-6 premium-heading">
-              Premium Desserts,
+              {t.home.hero.title}
               <br />
-              <span className="gold-accent">Crafted with Discipline</span>
+              <span className="gold-accent">{t.home.hero.subtitle}</span>
             </h1>
             
             <p className="text-xl md:text-2xl text-brand-light-gray mb-12 elegant-text max-w-3xl mx-auto">
-              Experience handcrafted desserts and trays made with precision, premium ingredients, 
-              and an unwavering commitment to quality. Montreal & Laval delivery.
+              {t.home.hero.description}
             </p>
           </motion.div>
 
@@ -80,7 +81,7 @@ export function HomePage() {
                 block: 'start',
               });
             }}
-            aria-label="Scroll to Why MojoDojo"
+            aria-label={t.home.hero.scrollAriaLabel}
           >
             <ChevronDown className="w-5 h-5" />
           </motion.a>
@@ -100,32 +101,17 @@ export function HomePage() {
             className="text-center mb-16"
           >
             <h2 className="text-4xl md:text-5xl font-bold mb-4 premium-heading">
-              Why <span className="gold-accent">MojoDojo</span>
+              {t.home.why.title} <span className="gold-accent">{t.home.why.titleAccent}</span>
             </h2>
             <p className="text-lg text-brand-light-gray elegant-text">
-              Desserts made with discipline, precision, and care
+              {t.home.why.subtitle}
             </p>
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                icon: CheckCircle,
-                title: 'Premium Quality',
-                description: 'Only the finest ingredients make it into our desserts. No compromises, no shortcuts.'
-              },
-              {
-                icon: Clock,
-                title: 'Freshly Made',
-                description: 'Every order is prepared fresh, ensuring maximum flavor and quality in every bite.'
-              },
-              {
-                icon: Star,
-                title: 'Crafted with Care',
-                description: 'Our team brings precision and passion to every dessert, treating each order like a masterpiece.'
-              }
-            ].map((item, index) => {
-              const Icon = item.icon;
+            {t.home.why.cards.map((card, index) => {
+              const icons = [CheckCircle, Clock, Star];
+              const Icon = icons[index];
               return (
                 <motion.div
                   key={index}
@@ -138,8 +124,8 @@ export function HomePage() {
                   <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-brand-gold-subtle mb-6">
                     <Icon className="w-8 h-8 text-brand-gold" />
                   </div>
-                  <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
-                  <p className="text-brand-light-gray elegant-text">{item.description}</p>
+                  <h3 className="text-xl font-semibold mb-3">{card.title}</h3>
+                  <p className="text-brand-light-gray elegant-text">{card.description}</p>
                 </motion.div>
               );
             })}
@@ -157,20 +143,15 @@ export function HomePage() {
             className="text-center mb-16"
           >
             <h2 className="text-4xl md:text-5xl font-bold mb-4 premium-heading">
-              How <span className="gold-accent">Ordering Works</span>
+              {t.home.howItWorks.title} <span className="gold-accent">{t.home.howItWorks.titleAccent}</span>
             </h2>
             <p className="text-lg text-brand-light-gray elegant-text">
-              Simple, fast, and reliable
+              {t.home.howItWorks.subtitle}
             </p>
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            {[
-              { step: '01', title: 'Browse Menu', description: 'Explore our selection of premium desserts and trays' },
-              { step: '02', title: 'Place Order', description: 'Choose your items and provide delivery details' },
-              { step: '03', title: 'We Prepare', description: 'Our team crafts your order fresh to perfection' },
-              { step: '04', title: 'Enjoy', description: 'Pickup or delivery — experience desserts done right' }
-            ].map((item, index) => (
+            {t.home.howItWorks.steps.map((item, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 30 }}
@@ -198,7 +179,7 @@ export function HomePage() {
             <Link to="/order">
               <Button size="lg" className="btn-primary-gold gap-2">
                 <ShoppingBag className="w-5 h-5" />
-                Start Your Order
+                {t.home.howItWorks.cta}
               </Button>
             </Link>
           </div>

@@ -5,12 +5,14 @@ import { api } from '../../lib/api';
 import { useCart } from '../contexts/CartContext';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export function CheckoutPage() {
   const { cart, updateQuantity, removeFromCart, clearCart, total, itemCount } = useCart();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
+  const { t } = useLanguage();
 
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
@@ -27,12 +29,12 @@ export function CheckoutPage() {
     e.preventDefault();
 
     if (!customerName.trim() || !customerEmail.trim() || !customerPhone.trim()) {
-      toast.error('Please fill in all required fields');
+      toast.error(t.checkout.fillRequired);
       return;
     }
 
     if (deliveryType === 'delivery' && !deliveryAddress.trim()) {
-      toast.error('Please provide a delivery address');
+      toast.error(t.checkout.fillDeliveryAddress);
       return;
     }
 
@@ -58,10 +60,10 @@ export function CheckoutPage() {
 
       clearCart();
       setOrderPlaced(true);
-      toast.success('Order placed successfully!');
+      toast.success(t.checkout.orderSuccess);
     } catch (error) {
       console.error('Failed to place order:', error);
-      toast.error('Failed to place order. Please try again.');
+      toast.error(t.checkout.orderFailed);
     } finally {
       setSubmitting(false);
     }
@@ -79,21 +81,21 @@ export function CheckoutPage() {
             <Check className="w-12 h-12 text-brand-black" />
           </div>
           <h1 className="text-4xl font-bold mb-4 premium-heading">
-            <span className="gold-accent">Order Placed!</span>
+            <span className="gold-accent">{t.checkout.success.title}</span>
           </h1>
           <p className="text-lg text-brand-light-gray elegant-text mb-4">
-            Thank you! We'll confirm your order details shortly via email or phone.
+            {t.checkout.success.message}
           </p>
           {requiresDeposit && (
             <p className="text-brand-gold font-semibold mb-8">
-              A $20 deposit is required for orders over $100. We'll contact you with payment details.
+              {t.checkout.success.depositNote}
             </p>
           )}
           <button
             onClick={() => navigate('/')}
             className="bg-brand-gold text-brand-black font-semibold px-8 py-3 rounded-lg hover:opacity-90 transition-all"
           >
-            Return to Home
+            {t.checkout.success.returnHome}
           </button>
         </motion.div>
       </div>
@@ -109,13 +111,13 @@ export function CheckoutPage() {
           className="text-center max-w-md mx-auto px-4"
         >
           <ShoppingBag className="w-20 h-20 mx-auto mb-6 text-gray-600" />
-          <h2 className="text-2xl font-bold text-white mb-3">Your cart is empty</h2>
-          <p className="text-gray-400 mb-8">Add some products before checking out.</p>
+          <h2 className="text-2xl font-bold text-white mb-3">{t.checkout.emptyCart}</h2>
+          <p className="text-gray-400 mb-8">{t.checkout.emptyCartSub}</p>
           <button
             onClick={() => navigate('/order')}
             className="bg-brand-gold text-brand-black font-semibold px-8 py-3 rounded-lg hover:opacity-90 transition-all"
           >
-            Browse Products
+            {t.checkout.browseProducts}
           </button>
         </motion.div>
       </div>
@@ -135,14 +137,14 @@ export function CheckoutPage() {
             className="flex items-center gap-2 text-gray-400 hover:text-brand-gold transition-colors mb-6 text-sm"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Products
+            {t.checkout.backToProducts}
           </button>
 
           <h1 className="text-4xl md:text-5xl font-bold premium-heading">
-            Check<span className="gold-accent">out</span>
+            {t.checkout.title}{' '}<span className="gold-accent">{t.checkout.titleAccent}</span>
           </h1>
           <p className="text-lg text-brand-light-gray elegant-text mt-2">
-            Review your order and complete your details
+            {t.checkout.subtitle}
           </p>
         </motion.div>
 
@@ -151,32 +153,32 @@ export function CheckoutPage() {
           <div className="lg:col-span-3">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="premium-card p-6 space-y-5">
-                <h2 className="text-xl font-semibold text-white">Your Details</h2>
+                <h2 className="text-xl font-semibold text-white">{t.checkout.yourDetails}</h2>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                      Full Name <span className="text-brand-gold">*</span>
+                      {t.checkout.name} <span className="text-brand-gold">*</span>
                     </label>
                     <input
                       type="text"
                       value={customerName}
                       onChange={e => setCustomerName(e.target.value)}
                       required
-                      placeholder="John Doe"
+                      placeholder={t.checkout.namePlaceholder}
                       className="w-full bg-black border-2 border-zinc-700 text-white rounded-lg px-4 py-2.5 focus:border-brand-gold focus:outline-none transition-colors"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                      Phone <span className="text-brand-gold">*</span>
+                      {t.checkout.phone} <span className="text-brand-gold">*</span>
                     </label>
                     <input
                       type="tel"
                       value={customerPhone}
                       onChange={e => setCustomerPhone(e.target.value)}
                       required
-                      placeholder="(514) 555-0123"
+                      placeholder={t.checkout.phonePlaceholder}
                       className="w-full bg-black border-2 border-zinc-700 text-white rounded-lg px-4 py-2.5 focus:border-brand-gold focus:outline-none transition-colors"
                     />
                   </div>
@@ -184,35 +186,38 @@ export function CheckoutPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                    Email <span className="text-brand-gold">*</span>
+                    {t.checkout.email} <span className="text-brand-gold">*</span>
                   </label>
                   <input
                     type="email"
                     value={customerEmail}
                     onChange={e => setCustomerEmail(e.target.value)}
                     required
-                    placeholder="john@example.com"
+                    placeholder={t.checkout.emailPlaceholder}
                     className="w-full bg-black border-2 border-zinc-700 text-white rounded-lg px-4 py-2.5 focus:border-brand-gold focus:outline-none transition-colors"
                   />
                 </div>
               </div>
 
               <div className="premium-card p-6 space-y-5">
-                <h2 className="text-xl font-semibold text-white">Delivery</h2>
+                <h2 className="text-xl font-semibold text-white">{t.checkout.delivery}</h2>
 
                 <div className="grid grid-cols-2 gap-3">
-                  {(['pickup', 'delivery'] as const).map(type => (
+                  {([
+                    { value: 'pickup' as const, label: t.checkout.pickup },
+                    { value: 'delivery' as const, label: t.checkout.delivery },
+                  ]).map(({ value, label }) => (
                     <button
-                      key={type}
+                      key={value}
                       type="button"
-                      onClick={() => setDeliveryType(type)}
-                      className={`p-3 rounded-lg border-2 font-medium capitalize transition-all ${
-                        deliveryType === type
+                      onClick={() => setDeliveryType(value)}
+                      className={`p-3 rounded-lg border-2 font-medium transition-all ${
+                        deliveryType === value
                           ? 'bg-brand-gold border-brand-gold text-brand-black'
                           : 'bg-zinc-900 border-zinc-700 text-white hover:border-zinc-500'
                       }`}
                     >
-                      {type}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -225,14 +230,14 @@ export function CheckoutPage() {
                       exit={{ opacity: 0, height: 0 }}
                     >
                       <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                        Delivery Address <span className="text-brand-gold">*</span>
+                        {t.checkout.deliveryAddress} <span className="text-brand-gold">*</span>
                       </label>
                       <input
                         type="text"
                         value={deliveryAddress}
                         onChange={e => setDeliveryAddress(e.target.value)}
                         required
-                        placeholder="123 Main St, Montreal, QC"
+                        placeholder={t.checkout.deliveryAddressPlaceholder}
                         className="w-full bg-black border-2 border-zinc-700 text-white rounded-lg px-4 py-2.5 focus:border-brand-gold focus:outline-none transition-colors"
                       />
                     </motion.div>
@@ -241,7 +246,7 @@ export function CheckoutPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                    Preferred Date / Time
+                    {t.checkout.preferredDateTime}
                   </label>
                   <input
                     type="datetime-local"
@@ -253,36 +258,37 @@ export function CheckoutPage() {
               </div>
 
               <div className="premium-card p-6 space-y-5">
-                <h2 className="text-xl font-semibold text-white">Payment Method</h2>
+                <h2 className="text-xl font-semibold text-white">{t.checkout.paymentMethod}</h2>
 
                 <div className="grid grid-cols-2 gap-3">
-                  {([['cash', 'Cash on Delivery'], ['online', 'Online Payment']] as const).map(
-                    ([value, label]) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setPaymentMethod(value)}
-                        className={`p-3 rounded-lg border-2 font-medium transition-all ${
-                          paymentMethod === value
-                            ? 'bg-brand-gold border-brand-gold text-brand-black'
-                            : 'bg-zinc-900 border-zinc-700 text-white hover:border-zinc-500'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    )
-                  )}
+                  {([
+                    { value: 'cash' as const, label: t.checkout.cash },
+                    { value: 'online' as const, label: t.checkout.online },
+                  ]).map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setPaymentMethod(value)}
+                      className={`p-3 rounded-lg border-2 font-medium transition-all ${
+                        paymentMethod === value
+                          ? 'bg-brand-gold border-brand-gold text-brand-black'
+                          : 'bg-zinc-900 border-zinc-700 text-white hover:border-zinc-500'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                    Special Instructions
+                    {t.checkout.instructions}
                   </label>
                   <textarea
                     value={notes}
                     onChange={e => setNotes(e.target.value)}
                     rows={3}
-                    placeholder="Any allergies or special requests..."
+                    placeholder={t.checkout.instructionsPlaceholder}
                     className="w-full bg-black border-2 border-zinc-700 text-white rounded-lg px-4 py-2.5 focus:border-brand-gold focus:outline-none transition-colors resize-none"
                   />
                 </div>
@@ -296,19 +302,19 @@ export function CheckoutPage() {
                 {submitting ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Placing Order…
+                    {t.checkout.placingOrder}
                   </>
                 ) : (
                   <>
                     <Check className="w-5 h-5" />
-                    Place Order — ${total.toFixed(2)}
+                    {t.checkout.placeOrder} — ${total.toFixed(2)}
                   </>
                 )}
               </button>
 
               {requiresDeposit && (
                 <p className="text-xs text-gray-400 text-center">
-                  We'll contact you to arrange the $20 deposit payment before fulfillment.
+                  {t.checkout.depositNote}
                 </p>
               )}
             </form>
@@ -320,7 +326,7 @@ export function CheckoutPage() {
               <div className="premium-card p-6">
                 <h2 className="text-xl font-semibold mb-5 flex items-center gap-2 text-white">
                   <ShoppingBag className="w-5 h-5 text-brand-gold" />
-                  Order Summary
+                  {t.checkout.orderSummary}
                 </h2>
 
                 <div className="space-y-3 mb-5">
@@ -331,7 +337,7 @@ export function CheckoutPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-white text-sm truncate">{item.product.name}</p>
-                        <p className="text-gray-400 text-xs mt-0.5">${item.product.price.toFixed(2)} each</p>
+                        <p className="text-gray-400 text-xs mt-0.5">${item.product.price.toFixed(2)} {t.checkout.each}</p>
                         <div className="flex items-center gap-2 mt-2">
                           <button
                             type="button"
@@ -368,7 +374,7 @@ export function CheckoutPage() {
 
                 <div className="border-t-2 border-zinc-800 pt-4 space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Subtotal ({itemCount} items)</span>
+                    <span className="text-gray-400">{t.checkout.subtotal(itemCount)}</span>
                     <span className="font-semibold text-white">${total.toFixed(2)}</span>
                   </div>
 
@@ -382,14 +388,14 @@ export function CheckoutPage() {
                       >
                         <AlertCircle className="w-4 h-4 text-brand-gold flex-shrink-0 mt-0.5" />
                         <p className="text-xs text-brand-gold">
-                          $20 deposit required for orders over $100
+                          {t.checkout.depositCartNote}
                         </p>
                       </motion.div>
                     )}
                   </AnimatePresence>
 
                   <div className="flex justify-between items-center pt-1">
-                    <span className="font-bold text-lg text-white">Total</span>
+                    <span className="font-bold text-lg text-white">{t.checkout.total}</span>
                     <span className="font-bold text-2xl text-brand-gold">${total.toFixed(2)}</span>
                   </div>
                 </div>

@@ -3,6 +3,7 @@ import { Star, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
 import { Button } from '../components/ui/button';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface Review {
   id: string;
@@ -11,6 +12,8 @@ interface Review {
   comment: string;
   created_at: string;
 }
+
+const HIDDEN_REVIEW_NAME = /^(amir|jad)\b/i;
 
 // Fake reviews from Instagram comments
 const FAKE_REVIEWS: Review[] = [
@@ -65,6 +68,7 @@ export default function Reviews() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { t, language } = useLanguage();
   
   // Form state
   const [name, setName] = useState('');
@@ -75,6 +79,8 @@ export default function Reviews() {
   useEffect(() => {
     loadReviews();
   }, []);
+
+  const filterReviews = (items: Review[]) => items.filter(review => !HIDDEN_REVIEW_NAME.test(review.name.trim()));
 
   const loadReviews = async () => {
     try {
@@ -89,8 +95,7 @@ export default function Reviews() {
 
       if (response.ok) {
         const data = await response.json();
-        // Combine fake reviews with real reviews
-        const allReviews = [...FAKE_REVIEWS, ...(data.reviews || [])];
+        const allReviews = filterReviews([...FAKE_REVIEWS, ...(data.reviews || [])]);
         setReviews(allReviews);
         setTotalReviews(allReviews.length);
         
@@ -110,7 +115,7 @@ export default function Reviews() {
     e.preventDefault();
     
     if (!name.trim() || !comment.trim()) {
-      alert('Please fill in all fields');
+      alert(t.reviews.fillAllFields);
       return;
     }
 
@@ -139,14 +144,14 @@ export default function Reviews() {
         // Reload reviews
         await loadReviews();
         
-        alert('Thank you for your review!');
+        alert(t.reviews.thankYou);
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to submit review');
+        alert(error.error || t.reviews.failedSubmit);
       }
     } catch (error) {
       console.error('Error submitting review:', error);
-      alert('Failed to submit review');
+      alert(t.reviews.failedSubmit);
     } finally {
       setSubmitting(false);
     }
@@ -157,11 +162,11 @@ export default function Reviews() {
     const now = new Date();
     const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
     
-    if (diffInDays === 0) return 'Today';
-    if (diffInDays === 1) return 'Yesterday';
-    if (diffInDays < 7) return `${diffInDays} days ago`;
-    if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} weeks ago`;
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    if (diffInDays === 0) return t.reviews.timeToday;
+    if (diffInDays === 1) return t.reviews.timeYesterday;
+    if (diffInDays < 7) return t.reviews.timeDaysAgo(diffInDays);
+    if (diffInDays < 30) return t.reviews.timeWeeksAgo(Math.floor(diffInDays / 7));
+    return date.toLocaleDateString(language === 'fr' ? 'fr-CA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
   return (
@@ -174,7 +179,7 @@ export default function Reviews() {
             animate={{ opacity: 1, y: 0 }}
             className="text-4xl md:text-5xl font-bold text-white mb-2"
           >
-            Client Reviews
+            {t.reviews.title}
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
@@ -182,7 +187,7 @@ export default function Reviews() {
             transition={{ delay: 0.1 }}
             className="text-[#D4AF37] text-lg"
           >
-            Hear from our happy clients
+            {t.reviews.subtitle}
           </motion.p>
         </div>
 
@@ -209,7 +214,7 @@ export default function Reviews() {
             <div className="text-5xl font-bold text-[#D4AF37] mb-2">
               {averageRating.toFixed(1)}/5
             </div>
-            <p className="text-gray-400">from {totalReviews}+ reviews</p>
+            <p className="text-gray-400">{t.reviews.fromReviews(totalReviews)}</p>
           </div>
         </motion.div>
 
@@ -220,7 +225,7 @@ export default function Reviews() {
             className="btn-primary-gold gap-2"
           >
             <Plus className="w-4 h-4" />
-            Leave a Review
+            {t.reviews.leaveReview}
           </Button>
         </div>
 
@@ -234,7 +239,7 @@ export default function Reviews() {
             </>
           ) : reviews.length === 0 ? (
             <div className="col-span-2 text-center py-12 text-gray-400">
-              No reviews yet. Be the first to leave a review!
+              {t.reviews.noReviews}
             </div>
           ) : (
             reviews.map((review, index) => (
@@ -290,25 +295,25 @@ export default function Reviews() {
                 className="bg-zinc-900 border-2 border-zinc-800 rounded-lg p-6 max-w-md w-full relative"
                 onClick={(e) => e.stopPropagation()}
               >
-                <h2 className="text-2xl font-bold text-white mb-6">Leave a Review</h2>
+                <h2 className="text-2xl font-bold text-white mb-6">{t.reviews.modalTitle}</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Your Name
+                      {t.reviews.yourName}
                     </label>
                     <input
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       className="w-full px-4 py-2 bg-black border-2 border-zinc-700 rounded-lg text-white focus:border-[#D4AF37] focus:outline-none transition-colors"
-                      placeholder="John Doe"
+                      placeholder={t.reviews.namePlaceholder}
                       required
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Rating
+                      {t.reviews.ratingLabel}
                     </label>
                     <div className="flex gap-2">
                       {[1, 2, 3, 4, 5].map((star) => (
@@ -334,14 +339,14 @@ export default function Reviews() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Your Review
+                      {t.reviews.yourReview}
                     </label>
                     <textarea
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
                       rows={4}
                       className="w-full px-4 py-2 bg-black border-2 border-zinc-700 rounded-lg text-white focus:border-[#D4AF37] focus:outline-none transition-colors resize-none"
-                      placeholder="Tell us about your experience..."
+                      placeholder={t.reviews.reviewPlaceholder}
                       required
                     />
                   </div>
@@ -352,14 +357,14 @@ export default function Reviews() {
                       onClick={() => setIsModalOpen(false)}
                       className="flex-1 px-4 py-2 border-2 border-zinc-700 text-white rounded-lg hover:bg-zinc-800 transition-colors"
                     >
-                      Cancel
+                      {t.reviews.cancel}
                     </button>
                     <button
                       type="submit"
                       disabled={submitting}
                       className="flex-1 bg-[#D4AF37] text-black font-semibold py-2 px-4 rounded-lg hover:bg-[#B8941F] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {submitting ? 'Submitting...' : 'Submit'}
+                      {submitting ? t.reviews.submitting : t.reviews.submit}
                     </button>
                   </div>
                 </form>

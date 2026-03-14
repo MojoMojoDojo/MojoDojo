@@ -4,30 +4,14 @@ import logoImage from '../../assets/MojoDojoLogo.png';
 import jadImage from '../../assets/JadPicture.png';
 import eddyImage from '../../assets/EddyGPicture.png';
 import mikeImage from '../../assets/MikePicture.png';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export function AboutPage() {
-  const team = [
-    {
-      name: 'Jad Haddad',
-      role: 'CEO & Co-Founder',
-      image: jadImage,
-      bio: 'Visionary leader driving MojoDojo\'s mission to redefine premium desserts with discipline and innovation.'
-    },
-    {
-      name: 'Eduardo Muntaner',
-      role: 'Co-Founder',
-      nickname: 'Eddy G',
-      image: eddyImage,
-      bio: 'Creative force behind our flavor profiles and brand identity, bringing passion to every creation.'
-    },
-    {
-      name: 'Michael Haddad',
-      role: 'Software Developer',
-      nickname: 'FatMike',
-      image: mikeImage,
-      bio: 'Building the digital infrastructure that powers MojoDojo\'s operations and customer experience.'
-    }
-  ];
+  const { t } = useLanguage();
+  const memberImages = [jadImage, eddyImage, mikeImage];
+  const team = t.about.team.members.map((member, i) => ({ ...member, image: memberImages[i] }));
+  const valueIcons = [Target, Heart, Award, Users];
+  const values = t.about.values.items.map((item, i) => ({ icon: valueIcons[i], ...item }));
 
   return (
     <div className="min-h-screen pt-20">
@@ -42,22 +26,17 @@ export function AboutPage() {
             >
               <div className="golden-line pl-6">
                 <h2 className="text-4xl font-bold mb-6 premium-heading">
-                  Our <span className="gold-accent">Story</span>
+                  {t.about.story.title} <span className="gold-accent">{t.about.story.titleAccent}</span>
                 </h2>
                 <div className="space-y-4 text-brand-light-gray elegant-text">
                   <p>
-                    MojoDojo was born from a simple belief: desserts should be extraordinary, 
-                    not ordinary. What started as a passion project has evolved into a disciplined 
-                    craft, where every cheesecake, brownie, and tiramisu is made with precision and care.
+                    {t.about.story.p1}
                   </p>
                   <p>
-                    We're not chasing trends or cutting corners. We're building something that lasts — 
-                    a brand that people remember, trust, and come back to. Every batch is a statement 
-                    of quality. Every order is an opportunity to prove ourselves.
+                    {t.about.story.p2}
                   </p>
                   <p>
-                    From social media orders to a complete brand experience, MojoDojo represents 
-                    ambition, consistency, and the relentless pursuit of excellence in every bite.
+                    {t.about.story.p3}
                   </p>
                 </div>
               </div>
@@ -87,36 +66,15 @@ export function AboutPage() {
             className="text-center mb-16"
           >
             <h2 className="text-4xl font-bold mb-4 premium-heading">
-              What We <span className="gold-accent">Stand For</span>
+              {t.about.values.title} <span className="gold-accent">{t.about.values.titleAccent}</span>
             </h2>
             <p className="text-lg text-brand-light-gray elegant-text">
-              The principles that guide every decision we make
+              {t.about.values.subtitle}
             </p>
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {[
-              {
-                icon: Target,
-                title: 'Precision',
-                description: 'Every measurement, every temperature, every timing — done right, every time.'
-              },
-              {
-                icon: Heart,
-                title: 'Passion',
-                description: 'We genuinely care about what we create and the people who enjoy it.'
-              },
-              {
-                icon: Award,
-                title: 'Quality',
-                description: 'Premium ingredients, proven techniques, and unwavering standards.'
-              },
-              {
-                icon: Users,
-                title: 'Consistency',
-                description: 'Deliver the same exceptional experience with every single order.'
-              }
-            ].map((value, index) => {
+            {values.map((value, index) => {
               const Icon = value.icon;
               return (
                 <motion.div
@@ -149,10 +107,10 @@ export function AboutPage() {
             className="text-center mb-16"
           >
             <h2 className="text-4xl font-bold mb-4 premium-heading">
-              The <span className="gold-accent">Team</span>
+              {t.about.team.title}<span className="gold-accent">{t.about.team.titleAccent}</span>
             </h2>
             <p className="text-lg text-brand-light-gray elegant-text">
-              The people building MojoDojo from the ground up
+              {t.about.team.description}
             </p>
           </motion.div>
 

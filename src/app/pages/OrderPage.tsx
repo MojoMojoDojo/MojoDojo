@@ -10,6 +10,7 @@ import { useCart } from '../contexts/CartContext';
 import biscoffCheesecakeImage from '../../assets/BiscoffCheescake.png';
 import brownieCheesecakeImage from '../../assets/BrownieCheescake.png';
 import tiramisuTrayImage from '../../assets/TiramisuTray.png';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export function OrderPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -17,6 +18,7 @@ export function OrderPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const { cart, addToCart, updateQuantity, total, itemCount } = useCart();
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const productFallbackImages: Record<string, string> = {
     prod_1: biscoffCheesecakeImage,
@@ -36,7 +38,7 @@ export function OrderPage() {
       setProducts(data.filter(p => p.visible && p.status !== 'sold_out'));
     } catch (error) {
       console.error('Failed to load products:', error);
-      toast.error('Failed to load products');
+      toast.error(t.order.failedToLoad);
     } finally {
       setLoading(false);
     }
@@ -63,10 +65,10 @@ export function OrderPage() {
         >
           <div>
             <h1 className="text-4xl md:text-5xl font-bold premium-heading">
-              Select <span className="gold-accent">Products</span>
+              {t.order.title} <span className="gold-accent">{t.order.titleAccent}</span>
             </h1>
             <p className="text-lg text-brand-light-gray elegant-text mt-2">
-              Add items to your cart, then proceed to checkout
+              {t.order.subtitle}
             </p>
           </div>
 
@@ -76,7 +78,7 @@ export function OrderPage() {
               className="hidden md:flex items-center gap-2 bg-brand-gold text-brand-black font-semibold px-5 py-3 rounded-lg hover:opacity-90 transition-all text-sm"
             >
               <ShoppingBag className="w-4 h-4" />
-              Checkout ({itemCount})
+              {t.order.checkout} ({itemCount})
             </button>
           )}
         </motion.div>
@@ -92,9 +94,9 @@ export function OrderPage() {
             >
               <AlertCircle className="w-6 h-6 text-brand-gold flex-shrink-0 mt-0.5" />
               <div>
-                <h3 className="font-semibold text-brand-gold mb-1">Deposit Required</h3>
+                <h3 className="font-semibold text-brand-gold mb-1">{t.order.deposit.title}</h3>
                 <p className="text-sm text-gray-300">
-                  Orders over $100 require a $20 deposit. We'll contact you after order placement to arrange payment.
+                  {t.order.deposit.description}
                 </p>
               </div>
             </motion.div>
@@ -111,7 +113,7 @@ export function OrderPage() {
         ) : products.length === 0 ? (
           <div className="text-center py-24 text-brand-light-gray">
             <ShoppingBag className="w-16 h-16 mx-auto mb-4 opacity-30" />
-            <p className="text-lg">No products available at the moment.</p>
+            <p className="text-lg">{t.order.noProducts}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -145,7 +147,7 @@ export function OrderPage() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-600">
-                        No Image
+                        {t.order.noImage}
                       </div>
                     )}
 
@@ -161,7 +163,7 @@ export function OrderPage() {
                       >
                         <AlertTriangle className="w-4 h-4 text-yellow-400 flex-shrink-0" />
                         <span className="text-xs text-yellow-300 font-medium whitespace-nowrap">
-                          Allergens / Dietary
+                          {t.order.allergens}
                         </span>
                       </div>
                     )}
@@ -205,12 +207,12 @@ export function OrderPage() {
                         <button
                           onClick={() => {
                             addToCart(product);
-                            toast.success(`${product.name} added!`);
+                            toast.success(t.order.addedToCart(product.name));
                           }}
                           className="flex items-center gap-1.5 bg-brand-gold text-brand-black font-semibold py-2 px-4 rounded-lg hover:opacity-90 transition-all text-sm"
                         >
                           <Plus className="w-4 h-4" />
-                          Add to Cart
+                          {t.order.addToCart}
                         </button>
                       )}
                     </div>
@@ -241,7 +243,7 @@ export function OrderPage() {
                 </div>
                 <div>
                   <p className="text-sm text-brand-light-gray">
-                    {itemCount} item{itemCount !== 1 ? 's' : ''}
+                    {t.order.items(itemCount)}
                   </p>
                   <p className="font-bold text-brand-gold text-lg">${total.toFixed(2)}</p>
                 </div>
@@ -249,7 +251,7 @@ export function OrderPage() {
 
               {requiresDeposit && (
                 <p className="hidden sm:block text-xs text-yellow-400">
-                  $20 deposit required
+                  {t.order.deposit.cartNote}
                 </p>
               )}
 
@@ -258,7 +260,7 @@ export function OrderPage() {
                 className="bg-brand-gold text-brand-black font-semibold flex items-center gap-2 px-6 py-3 rounded-lg hover:opacity-90 transition-all text-sm flex-shrink-0"
               >
                 <ShoppingBag className="w-4 h-4" />
-                Proceed to Checkout
+                {t.order.proceedToCheckout}
               </button>
             </div>
           </motion.div>

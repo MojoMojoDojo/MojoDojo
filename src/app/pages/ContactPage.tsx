@@ -6,12 +6,14 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { toast } from 'sonner';
 import { useState } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export function ContactPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const { t } = useLanguage();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,7 +21,7 @@ export function ContactPage() {
 
     // Simulate submission
     setTimeout(() => {
-      toast.success('Message sent! We\'ll get back to you soon.');
+      toast.success(t.contact.messageSent);
       setName('');
       setEmail('');
       setMessage('');
@@ -37,10 +39,10 @@ export function ContactPage() {
             className="text-center max-w-4xl mx-auto mb-12"
           >
             <h1 className="text-5xl md:text-6xl font-bold mb-6 premium-heading">
-              Get in <span className="gold-accent">Touch</span>
+              {t.contact.title} <span className="gold-accent">{t.contact.titleAccent}</span>
             </h1>
             <p className="text-xl text-brand-light-gray elegant-text">
-              Have questions? Want to place a custom order? We'd love to hear from you.
+              {t.contact.subtitle}
             </p>
           </motion.div>
 
@@ -51,11 +53,11 @@ export function ContactPage() {
               animate={{ opacity: 1, x: 0 }}
               className="premium-card p-8"
             >
-              <h2 className="text-2xl font-semibold mb-6 golden-line pl-4">Send Us a Message</h2>
+              <h2 className="text-2xl font-semibold mb-6 golden-line pl-4">{t.contact.formTitle}</h2>
               
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
-                  <Label htmlFor="name">Name</Label>
+                  <Label htmlFor="name">{t.contact.name}</Label>
                   <Input
                     id="name"
                     value={name}
@@ -66,7 +68,7 @@ export function ContactPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">{t.contact.email}</Label>
                   <Input
                     id="email"
                     type="email"
@@ -78,7 +80,7 @@ export function ContactPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="message">Message</Label>
+                  <Label htmlFor="message">{t.contact.message}</Label>
                   <Textarea
                     id="message"
                     value={message}
@@ -95,7 +97,7 @@ export function ContactPage() {
                   disabled={submitting}
                 >
                   <Send className="w-4 h-4" />
-                  {submitting ? 'Sending...' : 'Send Message'}
+                  {submitting ? t.contact.sending : t.contact.send}
                 </Button>
               </form>
             </motion.div>
@@ -107,7 +109,7 @@ export function ContactPage() {
               className="space-y-8"
             >
               <div className="premium-card p-8">
-                <h2 className="text-2xl font-semibold mb-6">Contact Information</h2>
+                <h2 className="text-2xl font-semibold mb-6">{t.contact.infoTitle}</h2>
                 
                 <div className="space-y-6">
                   <div className="flex items-start gap-4">
@@ -115,7 +117,7 @@ export function ContactPage() {
                       <Mail className="w-6 h-6 text-brand-gold" />
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-1">Email</h3>
+                        <h3 className="font-semibold mb-1">{t.contact.email}</h3>
                       <a href="mailto:hello@mojodojo.com" className="text-brand-light-gray hover:text-brand-gold transition-colors">
                         hello@mojodojo.com
                       </a>
@@ -127,8 +129,8 @@ export function ContactPage() {
                       <Phone className="w-6 h-6 text-brand-gold" />
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-1">Phone</h3>
-                      <p className="text-brand-light-gray">Available for orders</p>
+                      <h3 className="font-semibold mb-1">{t.contact.phone}</h3>
+                      <p className="text-brand-light-gray">{t.contact.phoneAvailable}</p>
                     </div>
                   </div>
 
@@ -137,9 +139,9 @@ export function ContactPage() {
                       <MapPin className="w-6 h-6 text-brand-gold" />
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-1">Service Area</h3>
-                      <p className="text-brand-light-gray">Montreal & Laval, Quebec</p>
-                      <p className="text-sm text-brand-light-gray mt-1">Delivery and pickup available</p>
+                      <h3 className="font-semibold mb-1">{t.contact.serviceAreaLabel}</h3>
+                      <p className="text-brand-light-gray">{t.contact.serviceAreaText}</p>
+                      <p className="text-sm text-brand-light-gray mt-1">{t.contact.deliveryPickup}</p>
                     </div>
                   </div>
 
@@ -148,7 +150,7 @@ export function ContactPage() {
                       <Instagram className="w-6 h-6 text-brand-gold" />
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-1">Social Media</h3>
+                        <h3 className="font-semibold mb-1">{t.contact.socialMedia}</h3>
                       <a
                         href="https://instagram.com/mojodojo"
                         target="_blank"
@@ -163,11 +165,9 @@ export function ContactPage() {
               </div>
 
               <div className="premium-card p-8 bg-brand-gold-subtle border-brand-gold">
-                <h3 className="font-semibold mb-3 text-brand-gold">Business Hours</h3>
+                <h3 className="font-semibold mb-3 text-brand-gold">{t.contact.businessHoursTitle}</h3>
                 <div className="space-y-2 text-sm text-brand-light-gray">
-                  <p>Orders accepted daily</p>
-                  <p>24-48 hours advance notice preferred</p>
-                  <p>Same-day orders subject to availability</p>
+                  {t.contact.businessHoursLines.map((line, i) => <p key={i}>{line}</p>)}
                 </div>
               </div>
             </motion.div>
