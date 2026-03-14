@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { CheckCircle, Clock, ShoppingBag, Star } from 'lucide-react';
+import { CheckCircle, ChevronDown, Clock, ShoppingBag, Star } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
@@ -66,6 +66,24 @@ export function HomePage() {
               and an unwavering commitment to quality. Montreal & Laval delivery.
             </p>
           </motion.div>
+
+          <motion.a
+            href="#why-mojodojo"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.55 }}
+            className="inline-flex items-center justify-center w-12 h-12 rounded-full border border-brand-gold/35 bg-black/25 text-brand-gold/80 backdrop-blur-sm transition-all duration-200 hover:scale-[1.04] hover:text-brand-gold hover:border-brand-gold/55"
+            onClick={(event) => {
+              event.preventDefault();
+              document.getElementById('why-mojodojo')?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start',
+              });
+            }}
+            aria-label="Scroll to Why MojoDojo"
+          >
+            <ChevronDown className="w-5 h-5" />
+          </motion.a>
         </div>
 
       </section>
