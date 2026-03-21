@@ -1,9 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
 
-const supabaseUrl = `https://${projectId}.supabase.co`;
+export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${projectId}.supabase.co`;
+export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || publicAnonKey;
 
-export const supabase = createClient(supabaseUrl, publicAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type UserRole = 'owner' | 'admin' | 'worker';
 
@@ -39,18 +40,7 @@ export interface Order {
   customer_name: string;
   customer_email: string;
   customer_phone: string;
-  status:
-    | 'request_received'
-    | 'under_review'
-    | 'accepted'
-    | 'rejected'
-    | 'ready_for_pickup'
-    | 'out_for_delivery'
-    | 'completed'
-    | 'pending'
-    | 'confirmed'
-    | 'in_preparation'
-    | 'cancelled';
+  status: 'request_received' | 'under_review' | 'accepted' | 'rejected';
   total: number;
   payment_method?: 'cash' | 'etranser' | 'arranged_after_approval' | 'online';
   payment_status?: 'pending' | 'paid' | 'arranged';

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Check, Loader2, ShoppingBag, Trash2, ArrowLeft, Plus, Minus, CalendarClock, CalendarDays, MapPin } from 'lucide-react';
-import { format, isValid, parse } from 'date-fns';
+import { format } from 'date-fns';
 import { api } from '../../lib/api';
 import { useCart } from '../contexts/CartContext';
 import { useNavigate } from 'react-router';
@@ -19,24 +19,99 @@ function formatDateDigits(value: string): string {
   return parts.join('/');
 }
 
-function parseDateInput(value: string): Date | undefined {
-  if (!/^\d{4}\/\d{2}\/\d{2}$/.test(value)) return undefined;
-  const parsed = parse(value, 'yyyy/MM/dd', new Date());
-  if (!isValid(parsed)) return undefined;
-  return format(parsed, 'yyyy/MM/dd') === value ? parsed : undefined;
+function parseDateInputToCanonical(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+
+  const withSeparators = trimmed.match(/^(\d{4})[\/-](\d{2})[\/-](\d{2})$/);
+  const compact = trimmed.match(/^(\d{4})(\d{2})(\d{2})$/);
+
+  const groups = withSeparators ?? compact;
+  if (!groups) return undefined;
+
+  const year = Number(groups[1]);
+  const month = Number(groups[2]);
+  const day = Number(groups[3]);
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return undefined;
+
+  const parsed = new Date(year, month - 1, day);
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return undefined;
+  }
+
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function canonicalToLocalDate(canonicalDate: string): Date | undefined {
+  const [yearRaw, monthRaw, dayRaw] = canonicalDate.split('-');
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return undefined;
+
+  const parsed = new Date(year, month - 1, day);
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
+function combineLocalDateAndTime(canonicalDate: string, timeValue: string): Date | undefined {
+  const date = canonicalToLocalDate(canonicalDate);
+  if (!date) return undefined;
+
+  const parts = timeValue.split(':');
+  if (parts.length !== 2) return undefined;
+
+  const hours = Number(parts[0]);
+  const minutes = Number(parts[1]);
+  if (
+    !Number.isInteger(hours) ||
+    !Number.isInteger(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return undefined;
+  }
+
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), hours, minutes, 0, 0);
 }
 
 const PICKUP_ADDRESS = '90 rue Prince';
 
 function buildHourOptions(startHour24: number, endHour24: number) {
-  return Array.from({ length: endHour24 - startHour24 + 1 }, (_, index) => {
+  return Array.from({ length: endHour24 - startHour24 }, (_, index) => {
     const hour24 = startHour24 + index;
+    const nextHour24 = hour24 + 1;
+    
     const hour12 = hour24 > 12 ? hour24 - 12 : hour24;
+    const nextHour12 = nextHour24 > 12 ? nextHour24 - 12 : nextHour24;
+    
     const period = hour24 >= 12 ? 'PM' : 'AM';
-
+    const nextPeriod = nextHour24 >= 12 ? 'PM' : 'AM';
+    
+    // Use same period for both hours if they're in the same half-day
+    const singlePeriod = period === nextPeriod ? period : ` ${period} - ${nextHour12} ${nextPeriod}`;
+    const label = period === nextPeriod 
+      ? `${hour12}–${nextHour12} ${period}`
+      : `${hour12} ${period} – ${nextHour12} ${nextPeriod}`;
+    
     return {
       value: `${String(hour24).padStart(2, '0')}:00`,
-      label: `${hour12}:00 ${period}`,
+      label,
     };
   });
 }
@@ -62,7 +137,11 @@ export function CheckoutPage() {
   const [preferredTime, setPreferredTime] = useState('');
   const [notes, setNotes] = useState('');
 
-  const selectedDate = useMemo(() => parseDateInput(preferredDateInput), [preferredDateInput]);
+  const canonicalPreferredDate = useMemo(() => parseDateInputToCanonical(preferredDateInput), [preferredDateInput]);
+  const selectedDate = useMemo(() => {
+    if (!canonicalPreferredDate) return undefined;
+    return canonicalToLocalDate(canonicalPreferredDate);
+  }, [canonicalPreferredDate]);
   const today = useMemo(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
@@ -79,8 +158,8 @@ export function CheckoutPage() {
   }, [availableHourOptions, preferredTime]);
 
   function buildPreferredDatetime(): string | undefined {
-    if (!selectedDate || !preferredTime) return undefined;
-    return `${format(selectedDate, 'yyyy/MM/dd')} ${preferredTime}`;
+    if (!canonicalPreferredDate || !preferredTime) return undefined;
+    return `${canonicalPreferredDate}T${preferredTime}`;
   }
 
   function validatePreferredDatetime(): boolean {
@@ -89,21 +168,29 @@ export function CheckoutPage() {
       return false;
     }
 
-    if (!selectedDate) {
+    if (!canonicalPreferredDate) {
       toast.error(t.checkout.invalidPreferredDate);
       return false;
     }
 
-    const [hours, minutes] = preferredTime.split(':').map(Number);
-    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    if (!availableHourOptions.some((option) => option.value === preferredTime)) {
       toast.error(t.checkout.invalidPreferredDateTime);
       return false;
     }
 
-    const requested = new Date(selectedDate);
-    requested.setHours(hours, minutes, 0, 0);
+    const requested = combineLocalDateAndTime(canonicalPreferredDate, preferredTime);
+    if (!requested) {
+      toast.error(t.checkout.invalidPreferredDateTime);
+      return false;
+    }
 
-    if (requested.getTime() < Date.now()) {
+    // Temporary checkout datetime debug logs.
+    console.debug('[checkout] selectedDateCanonical', canonicalPreferredDate);
+    console.debug('[checkout] selectedTime', preferredTime);
+    console.debug('[checkout] combinedDateTimeLocal', requested.toString());
+    console.debug('[checkout] nowLocal', new Date().toString());
+
+    if (requested.getTime() <= Date.now()) {
       toast.error(t.checkout.invalidPreferredDateTime);
       return false;
     }
@@ -153,7 +240,8 @@ export function CheckoutPage() {
       toast.success(t.checkout.orderSuccess);
     } catch (error) {
       console.error('Failed to submit order request:', error);
-      toast.error(t.checkout.orderFailed);
+      const message = error instanceof Error ? error.message : t.checkout.orderFailed;
+      toast.error(`${t.checkout.orderFailed}${message ? ` (${message})` : ''}`);
     } finally {
       setSubmitting(false);
     }
@@ -405,9 +493,6 @@ export function CheckoutPage() {
                           </option>
                         ))}
                       </select>
-                      <p className="mt-1 text-xs text-zinc-500">
-                        {deliveryType === 'pickup' ? t.checkout.pickupTimeWindow : t.checkout.deliveryTimeWindow}
-                      </p>
                     </div>
                   </div>
                 </div>

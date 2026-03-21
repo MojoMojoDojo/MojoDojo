@@ -1,10 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import { projectId, publicAnonKey } from '/utils/supabase/info';
-
-const supabaseUrl = `https://${projectId}.supabase.co`;
-
-const supabase = createClient(supabaseUrl, publicAnonKey);
+import { supabase, supabaseAnonKey } from '../../lib/supabase';
 const DEMO_EMAIL = 'admin@mojodojo.com';
 const DEMO_PASSWORD = 'admin123';
 const DEMO_STORAGE_KEY = 'mojodojo.demo.user';
@@ -55,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const demoUser = getStoredDemoUser();
       if (demoUser) {
         setUser(demoUser);
-        setAccessToken(publicAnonKey);
+        setAccessToken(supabaseAnonKey);
         return;
       }
 
@@ -91,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(demoUser));
         setUser(demoUser);
-        setAccessToken(publicAnonKey);
+        setAccessToken(supabaseAnonKey);
         return demoUser;
       }
 

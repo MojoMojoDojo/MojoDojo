@@ -25,7 +25,7 @@ export const fr: Translations = {
       terms: "Conditions d'utilisation",
     },
     location: 'Montréal & Laval, Québec',
-    available: 'Disponible pour les commandes',
+    available: '613-TBD-TBDD',
     copyright: (year: number) => `© ${year} MojoDojo. Tous droits réservés. Préparé avec discipline.`,
   },
   home: {
@@ -128,7 +128,7 @@ export const fr: Translations = {
     sending: 'Envoi en cours...',
     messageSent: "Message envoyé ! Nous vous répondrons bientôt.",
     infoTitle: 'Coordonnées',
-    phoneAvailable: 'Disponible pour les commandes',
+    phoneAvailable: '613-TBD-TBDD',
     serviceAreaLabel: 'Zone de service',
     serviceAreaText: 'Montréal & Laval, Québec',
     deliveryPickup: 'Livraison et cueillette disponibles',
@@ -341,7 +341,7 @@ export const fr: Translations = {
     preferredDatePlaceholder: 'AAAA/MM/JJ',
     openCalendar: 'Ouvrir le calendrier',
     preferredTime: 'Heure',
-    preferredTimePlaceholder: 'Selectionnez une heure',
+    preferredTimePlaceholder: 'Sélectionnez une plage horaire',
     pickupTimeWindow: 'Heures de cueillette : 8:00 AM - 8:00 PM',
     deliveryTimeWindow: 'Heures de livraison : 4:00 PM - 11:00 PM',
     paymentAndApproval: 'Acceptation et paiement',
@@ -374,6 +374,12 @@ export const fr: Translations = {
       emailStep1: 'Nous la reverrons rapidement et nous vous ecrirons ensuite pour confirmer les prochaines etapes.',
       emailStep2: 'La date et l heure demandees seront confirmees par courriel une fois la commande approuvee.',
       returnHome: "Retour à l'accueil",
+    },
+  },
+  adminDashboard: {
+    quickAdd: {
+      addNumberPlaceholder: 'Ajouter un nombre',
+      applyQuantity: 'Appliquer la quantite',
     },
   },
   common: {

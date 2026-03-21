@@ -1,4 +1,5 @@
 import type { Product } from '../../lib/supabase';
+import { getTiramisuSizeExtraPrice } from './pricing';
 
 export interface PreparationOption {
   id: string;
@@ -70,20 +71,6 @@ const TIRAMISU_PREMIUM_ADDONS: PremiumAddOn[] = [
   },
 ];
 
-const TIRAMISU_SIZE_OPTIONS: TiramisuSizeOption[] = [
-  {
-    id: 'small',
-    labelKey: 'smallTiramisu',
-    // Product base price is the large tray price. Small applies a discount from base.
-    extraPrice: -15,
-  },
-  {
-    id: 'large',
-    labelKey: 'largeTiramisu',
-    extraPrice: 0,
-  },
-];
-
 function isTiramisu(product: Product): boolean {
   const lowerName = product.name.toLowerCase();
   const lowerNameFr = product.name_fr?.toLowerCase() ?? '';
@@ -103,7 +90,20 @@ export function getPremiumAddOns(product: Product): PremiumAddOn[] {
 }
 
 export function getTiramisuSizeOptions(product: Product): TiramisuSizeOption[] {
-  return isTiramisu(product) ? TIRAMISU_SIZE_OPTIONS : [];
+  if (!isTiramisu(product)) return [];
+
+  return [
+    {
+      id: 'small',
+      labelKey: 'smallTiramisu',
+      extraPrice: getTiramisuSizeExtraPrice('small', product.price),
+    },
+    {
+      id: 'large',
+      labelKey: 'largeTiramisu',
+      extraPrice: getTiramisuSizeExtraPrice('large', product.price),
+    },
+  ];
 }
 
 function normalizeSelection(input?: ProductCustomizationInput): {

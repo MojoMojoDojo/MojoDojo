@@ -1,4 +1,11 @@
 import type { Product } from '../../lib/supabase';
+import { calculateOperationsSummary } from './operationsCalculator';
+import { CORE_OPERATIONS_DATA } from './operationsDataModel';
+import {
+  getTiramisuSizeExtraPrice,
+  getVariantUnitPrice,
+  TIRAMISU_VARIANT_IDS,
+} from './pricing';
 
 export type MainOrderStatus = 'all' | 'request_received' | 'under_review' | 'accepted' | 'rejected';
 
@@ -10,22 +17,17 @@ export const MAIN_ORDER_STATUS_LABELS: Record<MainOrderStatus, string> = {
   rejected: 'Rejected',
 };
 
-const LEGACY_TO_MAIN_STATUS: Record<string, Exclude<MainOrderStatus, 'all'>> = {
-  request_received: 'request_received',
-  under_review: 'under_review',
-  accepted: 'accepted',
-  rejected: 'rejected',
-  pending: 'under_review',
-  confirmed: 'accepted',
-  in_preparation: 'accepted',
-  ready_for_pickup: 'accepted',
-  out_for_delivery: 'accepted',
-  completed: 'accepted',
-  cancelled: 'rejected',
-};
+const MAIN_STATUS_VALUES: Exclude<MainOrderStatus, 'all'>[] = [
+  'request_received',
+  'under_review',
+  'accepted',
+  'rejected',
+];
 
 export function toMainOrderStatus(status: string): Exclude<MainOrderStatus, 'all'> {
-  return LEGACY_TO_MAIN_STATUS[status] ?? 'under_review';
+  return MAIN_STATUS_VALUES.includes(status as Exclude<MainOrderStatus, 'all'>)
+    ? (status as Exclude<MainOrderStatus, 'all'>)
+    : 'under_review';
 }
 
 export function statusDisplayLabel(status: string): string {
@@ -42,72 +44,72 @@ export interface OperationalIngredient {
 
 export interface OperationalSku {
   id: string;
+  variantId: string;
   label: string;
   revenuePerUnit: number;
   recipe: Record<string, number>;
 }
 
-export const OPERATIONAL_INGREDIENTS: OperationalIngredient[] = [
-  { id: 'cream_cheese', name: 'Cream cheese', unit: 'g', unitCost: 0.014 },
-  { id: 'biscoff_spread', name: 'Biscoff spread', unit: 'g', unitCost: 0.018 },
-  { id: 'eggs', name: 'Eggs', unit: 'pcs', unitCost: 0.42 },
-  { id: 'sugar', name: 'Sugar', unit: 'g', unitCost: 0.0015 },
-  { id: 'cocoa', name: 'Cocoa powder', unit: 'g', unitCost: 0.032 },
-  { id: 'ladyfingers', name: 'Ladyfingers', unit: 'g', unitCost: 0.011 },
-  { id: 'mascarpone', name: 'Mascarpone', unit: 'g', unitCost: 0.02 },
-  { id: 'espresso', name: 'Espresso', unit: 'ml', unitCost: 0.01 },
-  { id: 'brownie_mix', name: 'Brownie base mix', unit: 'g', unitCost: 0.009 },
-  { id: 'butter', name: 'Butter', unit: 'g', unitCost: 0.012 },
-];
+export const OPERATIONAL_INGREDIENTS: OperationalIngredient[] = CORE_OPERATIONS_DATA.ingredients.map((ingredient) => ({
+  id: ingredient.id,
+  name: ingredient.name.en,
+  unit: ingredient.unit,
+  unitCost: ingredient.unitCost,
+}));
+
+function recipeForVariant(variantId: string): Record<string, number> {
+  const recipe = CORE_OPERATIONS_DATA.recipes.find((row) => row.variantId === variantId);
+  if (!recipe) return {};
+
+  const rows = CORE_OPERATIONS_DATA.recipeIngredients.filter((row) => row.recipeId === recipe.id);
+  return rows.reduce<Record<string, number>>((acc, row) => {
+    acc[row.ingredientId] = row.quantity;
+    return acc;
+  }, {});
+}
 
 export const QUICK_ADD_SKUS: OperationalSku[] = [
   {
     id: 'biscoff_cheesecake',
+    variantId: 'variant_biscoff_standard',
     label: 'Biscoff Cheesecake',
-    revenuePerUnit: 48,
-    recipe: {
-      cream_cheese: 700,
-      biscoff_spread: 220,
-      eggs: 5,
-      sugar: 140,
-      butter: 120,
-    },
+    revenuePerUnit: getVariantUnitPrice('variant_biscoff_standard', 15),
+    recipe: recipeForVariant('variant_biscoff_standard'),
   },
   {
     id: 'cheesecake_brownie_tray',
+    variantId: 'variant_brownie_tray_standard',
     label: 'Cheesecake Brownie Tray',
-    revenuePerUnit: 52,
-    recipe: {
-      cream_cheese: 420,
-      brownie_mix: 460,
-      eggs: 4,
-      sugar: 180,
-      butter: 160,
-    },
+    revenuePerUnit: getVariantUnitPrice('variant_brownie_tray_standard', 25),
+    recipe: recipeForVariant('variant_brownie_tray_standard'),
   },
   {
     id: 'tiramisu_small',
+    variantId: 'variant_tiramisu_small',
     label: 'Tiramisu Small',
-    revenuePerUnit: 30,
-    recipe: {
-      mascarpone: 300,
-      ladyfingers: 190,
-      espresso: 220,
-      sugar: 80,
-      cocoa: 8,
-    },
+    revenuePerUnit: getVariantUnitPrice(TIRAMISU_VARIANT_IDS.small, 10),
+    recipe: recipeForVariant('variant_tiramisu_small'),
   },
   {
     id: 'tiramisu_large',
+    variantId: 'variant_tiramisu_large',
     label: 'Tiramisu Large',
-    revenuePerUnit: 55,
-    recipe: {
-      mascarpone: 580,
-      ladyfingers: 360,
-      espresso: 400,
-      sugar: 150,
-      cocoa: 14,
-    },
+    revenuePerUnit: getVariantUnitPrice(TIRAMISU_VARIANT_IDS.large, 25),
+    recipe: recipeForVariant('variant_tiramisu_large'),
+  },
+  {
+    id: 'tiramisu_small_alcohol',
+    variantId: 'variant_tiramisu_small_alcohol',
+    label: 'Tiramisu Small + Marsala',
+    revenuePerUnit: getVariantUnitPrice(TIRAMISU_VARIANT_IDS.small_alcohol, 15),
+    recipe: recipeForVariant('variant_tiramisu_small_alcohol'),
+  },
+  {
+    id: 'tiramisu_large_alcohol',
+    variantId: 'variant_tiramisu_large_alcohol',
+    label: 'Tiramisu Large + Marsala',
+    revenuePerUnit: getVariantUnitPrice(TIRAMISU_VARIANT_IDS.large_alcohol, 30),
+    recipe: recipeForVariant('variant_tiramisu_large_alcohol'),
   },
 ];
 
@@ -116,6 +118,7 @@ export interface IngredientWorksheetRow {
   ingredientName: string;
   unit: string;
   quantityRequired: number;
+  quantityRequiredDisplay: string;
   unitCost: number;
   extendedCost: number;
 }
@@ -127,53 +130,29 @@ export interface WorksheetTotals {
 }
 
 export function buildIngredientWorksheet(counts: Record<string, number>) {
-  const ingredientMap = new Map(
-    OPERATIONAL_INGREDIENTS.map((ingredient) => [ingredient.id, ingredient]),
-  );
+  const lines = QUICK_ADD_SKUS.map((sku) => ({
+    variantId: sku.variantId,
+    quantity: counts[sku.id] ?? 0,
+  }));
 
-  const usageByIngredient = new Map<string, number>();
-  let totalRevenue = 0;
+  const summary = calculateOperationsSummary(lines, CORE_OPERATIONS_DATA);
 
-  for (const sku of QUICK_ADD_SKUS) {
-    const quantity = counts[sku.id] ?? 0;
-    if (quantity <= 0) continue;
-
-    totalRevenue += sku.revenuePerUnit * quantity;
-
-    for (const [ingredientId, amountPerUnit] of Object.entries(sku.recipe)) {
-      const current = usageByIngredient.get(ingredientId) ?? 0;
-      usageByIngredient.set(ingredientId, current + amountPerUnit * quantity);
-    }
-  }
-
-  const rows: IngredientWorksheetRow[] = [];
-  let totalIngredientCost = 0;
-
-  for (const [ingredientId, quantityRequired] of usageByIngredient.entries()) {
-    const ingredient = ingredientMap.get(ingredientId);
-    if (!ingredient) continue;
-
-    const extendedCost = quantityRequired * ingredient.unitCost;
-    totalIngredientCost += extendedCost;
-
-    rows.push({
-      ingredientId,
-      ingredientName: ingredient.name,
-      unit: ingredient.unit,
-      quantityRequired,
-      unitCost: ingredient.unitCost,
-      extendedCost,
-    });
-  }
-
-  rows.sort((a, b) => a.ingredientName.localeCompare(b.ingredientName));
+  const rows: IngredientWorksheetRow[] = summary.rows.map((row) => ({
+    ingredientId: row.ingredientId,
+    ingredientName: row.ingredientName,
+    unit: row.unit,
+    quantityRequired: row.quantityRequired,
+    quantityRequiredDisplay: `${row.quantityRequired.toFixed(2)} ${row.unit}`,
+    unitCost: row.unitCost,
+    extendedCost: row.extendedCost,
+  }));
 
   return {
     rows,
     totals: {
-      totalIngredientCost,
-      totalRevenue,
-      estimatedGrossProfit: totalRevenue - totalIngredientCost,
+      totalIngredientCost: summary.totals.totalIngredientCost,
+      totalRevenue: summary.totals.totalRevenue,
+      estimatedGrossProfit: summary.totals.estimatedGrossProfit,
     } satisfies WorksheetTotals,
   };
 }
@@ -213,8 +192,8 @@ export function createInitialProductSetups(products: Product[]): AdminProductSet
   return products.map((product) => {
     const variants: ProductVariantSetup[] = isTiramisuProduct(product)
       ? [
-          { id: 'small', label: 'Small', priceModifier: 0 },
-          { id: 'large', label: 'Large', priceModifier: 25 },
+          { id: 'small', label: 'Small', priceModifier: getTiramisuSizeExtraPrice('small', product.price) },
+          { id: 'large', label: 'Large', priceModifier: getTiramisuSizeExtraPrice('large', product.price) },
         ]
       : [];
 

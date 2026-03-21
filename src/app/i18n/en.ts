@@ -23,7 +23,7 @@ export const en = {
       terms: 'Terms of Service',
     },
     location: 'Montreal & Laval, Quebec',
-    available: 'Available for orders',
+    available: '613-TBD-TBDD',
     copyright: (year: number) => `© ${year} MojoDojo. All rights reserved. Crafted with discipline.`,
   },
   home: {
@@ -126,7 +126,7 @@ export const en = {
     sending: 'Sending...',
     messageSent: "Message sent! We'll get back to you soon.",
     infoTitle: 'Contact Information',
-    phoneAvailable: 'Available for orders',
+    phoneAvailable: '613-TBD-TBDD',
     serviceAreaLabel: 'Service Area',
     serviceAreaText: 'Montreal & Laval, Quebec',
     deliveryPickup: 'Delivery and pickup available',
@@ -339,7 +339,7 @@ export const en = {
     preferredDatePlaceholder: 'YYYY/MM/DD',
     openCalendar: 'Open calendar',
     preferredTime: 'Time',
-    preferredTimePlaceholder: 'Select an hour',
+    preferredTimePlaceholder: 'Select',
     pickupTimeWindow: 'Pickup hours: 8:00 AM - 8:00 PM',
     deliveryTimeWindow: 'Delivery hours: 4:00 PM - 11:00 PM',
     paymentAndApproval: 'Approval and Payment',
@@ -372,6 +372,12 @@ export const en = {
       emailStep1: 'We will review it and send a confirmation email shortly with the next steps.',
       emailStep2: 'Your requested date and time will be confirmed by email once we approve the order.',
       returnHome: 'Return to Home',
+    },
+  },
+  adminDashboard: {
+    quickAdd: {
+      addNumberPlaceholder: 'Add a number',
+      applyQuantity: 'Apply quantity',
     },
   },
   common: {

@@ -2,7 +2,7 @@ import { Outlet, useLocation } from 'react-router';
 import { useEffect } from 'react';
 import { Navigation } from '../components/Navigation';
 import { Footer } from '../components/Footer';
-import { projectId, publicAnonKey } from '/utils/supabase/info';
+import { supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -18,11 +18,11 @@ export function RootLayout() {
     const initDatabase = async () => {
       try {
         const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-44229999/init`,
+          `${supabaseUrl}/functions/v1/make-server-44229999/init`,
           {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${publicAnonKey}`,
+              'Authorization': `Bearer ${supabaseAnonKey}`,
             },
           }
         );

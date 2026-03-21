@@ -66,6 +66,17 @@ export function OrdersManagement() {
     ? orders
     : orders.filter((order) => toMainOrderStatus(order.status) === filter);
 
+  function formatPreferredDateTime(value?: string) {
+    if (!value) return '—';
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+
+    return parsed.toLocaleString();
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -128,6 +139,10 @@ export function OrdersManagement() {
                   <div>
                     <span className="text-brand-light-gray">Delivery Type:</span>{' '}
                     <span className="capitalize">{order.delivery_type}</span>
+                  </div>
+                  <div>
+                    <span className="text-brand-light-gray">Preferred Date/Time:</span>{' '}
+                    <span>{formatPreferredDateTime(order.preferred_datetime)}</span>
                   </div>
                   <div>
                     <span className="text-brand-light-gray">Payment:</span>{' '}

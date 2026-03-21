@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Star, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { projectId, publicAnonKey } from '/utils/supabase/info';
+import { supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
 import { Button } from '../components/ui/button';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -85,10 +85,10 @@ export default function Reviews() {
   const loadReviews = async () => {
     try {
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-44229999/reviews`,
+        `${supabaseUrl}/functions/v1/make-server-44229999/reviews`,
         {
           headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
+            'Authorization': `Bearer ${supabaseAnonKey}`,
           },
         }
       );
@@ -123,12 +123,12 @@ export default function Reviews() {
 
     try {
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-44229999/reviews`,
+        `${supabaseUrl}/functions/v1/make-server-44229999/reviews`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${publicAnonKey}`,
+            'Authorization': `Bearer ${supabaseAnonKey}`,
           },
           body: JSON.stringify({ name, rating, comment }),
         }

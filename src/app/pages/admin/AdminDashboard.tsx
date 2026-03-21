@@ -9,9 +9,11 @@ import {
   CirclePlus,
   CircleMinus,
   ClipboardList,
+  Check,
 } from 'lucide-react';
 import type { Order } from '../../../lib/supabase';
 import { Link } from 'react-router';
+import { useLanguage } from '../../contexts/LanguageContext';
 import {
   buildIngredientWorksheet,
   MAIN_ORDER_STATUS_LABELS,
@@ -30,9 +32,11 @@ import {
 
 export function AdminDashboard() {
   const { user, accessToken } = useAuth();
+  const { t } = useLanguage();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [quickAddCounts, setQuickAddCounts] = useState<Record<string, number>>({});
+  const [quickAddDrafts, setQuickAddDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadData();
@@ -104,8 +108,41 @@ export function AdminDashboard() {
     });
   }
 
+  function updateQuickAddDraft(skuId: string, value: string) {
+    if (!/^\d*$/.test(value)) return;
+
+    setQuickAddDrafts((current) => ({
+      ...current,
+      [skuId]: value,
+    }));
+  }
+
+  function applyQuickAddDraft(skuId: string) {
+    const raw = quickAddDrafts[skuId] ?? '';
+    const amount = Number(raw);
+    if (!Number.isInteger(amount) || amount <= 0) return;
+
+    incrementSku(skuId, amount);
+    setQuickAddDrafts((current) => ({
+      ...current,
+      [skuId]: '',
+    }));
+  }
+
   function resetWorksheet() {
     setQuickAddCounts({});
+    setQuickAddDrafts({});
+  }
+
+  function formatPreferredDateTime(value?: string) {
+    if (!value) return '—';
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+
+    return parsed.toLocaleString();
   }
 
   return (
@@ -171,6 +208,7 @@ export function AdminDashboard() {
                     variant="outline"
                     className="btn-outline-gold"
                     onClick={() => incrementSku(sku.id, -1)}
+                    aria-label={`decrease ${sku.label}`}
                   >
                     <CircleMinus className="w-4 h-4" />
                   </Button>
@@ -179,10 +217,33 @@ export function AdminDashboard() {
                     size="sm"
                     className="btn-primary-gold"
                     onClick={() => incrementSku(sku.id, 1)}
+                    aria-label={`increase ${sku.label}`}
                   >
-                    <CirclePlus className="w-4 h-4 mr-1" />
-                    +1 {sku.label}
+                    <CirclePlus className="w-4 h-4" />
                   </Button>
+
+                  <div className="ml-auto flex items-center gap-2 min-w-0">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={quickAddDrafts[sku.id] ?? ''}
+                      onChange={(event) => updateQuickAddDraft(sku.id, event.target.value)}
+                      placeholder={t.adminDashboard.quickAdd.addNumberPlaceholder}
+                      className="h-9 w-28 rounded-md border border-brand-dark-gray bg-black/30 px-2 text-sm text-white placeholder:text-brand-light-gray/70 focus:border-brand-gold focus:outline-none"
+                      aria-label={`${sku.label} ${t.adminDashboard.quickAdd.addNumberPlaceholder}`}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="btn-outline-gold"
+                      onClick={() => applyQuickAddDraft(sku.id)}
+                      disabled={!quickAddDrafts[sku.id] || Number(quickAddDrafts[sku.id]) <= 0}
+                      aria-label={t.adminDashboard.quickAdd.applyQuantity}
+                    >
+                      <Check className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -206,7 +267,6 @@ export function AdminDashboard() {
               <TableHeader>
                 <TableRow className="border-brand-dark-gray hover:bg-transparent">
                   <TableHead>Ingredient</TableHead>
-                  <TableHead>Unit</TableHead>
                   <TableHead className="text-right">Qty Required</TableHead>
                   <TableHead className="text-right">Unit Cost</TableHead>
                   <TableHead className="text-right">Extended Cost</TableHead>
@@ -216,8 +276,7 @@ export function AdminDashboard() {
                 {worksheet.rows.map((row) => (
                   <TableRow key={row.ingredientId} className="border-brand-dark-gray hover:bg-brand-charcoal">
                     <TableCell>{row.ingredientName}</TableCell>
-                    <TableCell>{row.unit}</TableCell>
-                    <TableCell className="text-right">{row.quantityRequired.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{row.quantityRequiredDisplay}</TableCell>
                     <TableCell className="text-right">${row.unitCost.toFixed(4)}</TableCell>
                     <TableCell className="text-right">${row.extendedCost.toFixed(2)}</TableCell>
                   </TableRow>
@@ -275,14 +334,12 @@ export function AdminDashboard() {
                 <div className="flex-1">
                   <p className="font-semibold">{order.customer_name}</p>
                   <p className="text-sm text-brand-light-gray">
-                    {order.items.length} item(s) • {order.delivery_type}
+                    {order.delivery_type} • {formatPreferredDateTime(order.preferred_datetime)}
                   </p>
+                  <p className="text-xs text-brand-light-gray mt-1">{new Date(order.created_at).toLocaleString()}</p>
                 </div>
                 <div className="text-right mr-4">
                   <p className="font-bold gold-accent">${order.total.toFixed(2)}</p>
-                  <p className="text-xs text-brand-light-gray">
-                    {new Date(order.created_at).toLocaleDateString()}
-                  </p>
                 </div>
                 <div className={`status-badge ${
                   ['request_received', 'under_review'].includes(toMainOrderStatus(order.status))
@@ -297,27 +354,6 @@ export function AdminDashboard() {
             ))}
           </div>
         )}
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Link to="/admin/dashboard/orders" className="premium-card p-6 hover:border-brand-gold transition-colors group">
-          <ShoppingCart className="w-8 h-8 text-brand-gold mb-3 group-hover:scale-110 transition-transform" />
-          <h3 className="font-semibold mb-1">Manage Orders</h3>
-          <p className="text-sm text-brand-light-gray">Review requests and update the main status</p>
-        </Link>
-
-        <Link to="/admin/dashboard/products" className="premium-card p-6 hover:border-brand-gold transition-colors group">
-          <ClipboardList className="w-8 h-8 text-brand-gold mb-3 group-hover:scale-110 transition-transform" />
-          <h3 className="font-semibold mb-1">Products</h3>
-          <p className="text-sm text-brand-light-gray">Maintain product details, availability, and recipe links</p>
-        </Link>
-
-        <Link to="/admin/dashboard/inventory" className="premium-card p-6 hover:border-brand-gold transition-colors group">
-          <AlertCircle className="w-8 h-8 text-brand-gold mb-3 group-hover:scale-110 transition-transform" />
-          <h3 className="font-semibold mb-1">Inventory</h3>
-          <p className="text-sm text-brand-light-gray">Check stock and refill priorities</p>
-        </Link>
       </div>
     </div>
   );
