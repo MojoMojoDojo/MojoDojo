@@ -1,5 +1,5 @@
 import type { Product, Order, Ingredient, GalleryItem } from './supabase';
-import { supabase, supabaseAnonKey, supabaseUrl } from './supabase';
+import { supabase, supabaseFunctionAnonKey, supabaseUrl } from './supabase';
 
 const API_BASE = `${supabaseUrl}/functions/v1/make-server-44229999`;
 
@@ -78,7 +78,7 @@ function mapOrderRowsToOrders(orderRows: OrderRow[], itemRows: OrderItemRow[]): 
 async function apiCall(endpoint: string, options: ApiOptions = {}) {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${options.token || supabaseAnonKey}`,
+    'Authorization': `Bearer ${options.token || supabaseFunctionAnonKey}`,
   };
 
   const config: RequestInit = {

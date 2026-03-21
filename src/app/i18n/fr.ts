@@ -341,7 +341,7 @@ export const fr: Translations = {
     preferredDatePlaceholder: 'AAAA/MM/JJ',
     openCalendar: 'Ouvrir le calendrier',
     preferredTime: 'Heure',
-    preferredTimePlaceholder: 'Sélectionnez une plage horaire',
+    preferredTimePlaceholder: 'Sélectionnez',
     pickupTimeWindow: 'Heures de cueillette : 8:00 AM - 8:00 PM',
     deliveryTimeWindow: 'Heures de livraison : 4:00 PM - 11:00 PM',
     paymentAndApproval: 'Acceptation et paiement',

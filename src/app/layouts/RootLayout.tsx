@@ -2,7 +2,7 @@ import { Outlet, useLocation } from 'react-router';
 import { useEffect } from 'react';
 import { Navigation } from '../components/Navigation';
 import { Footer } from '../components/Footer';
-import { supabaseAnonKey, supabaseUrl } from '../../lib/supabase';
+import { supabaseFunctionAnonKey, supabaseUrl } from '../../lib/supabase';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -22,7 +22,7 @@ export function RootLayout() {
           {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${supabaseAnonKey}`,
+              'Authorization': `Bearer ${supabaseFunctionAnonKey}`,
             },
           }
         );

@@ -3,6 +3,7 @@ import { projectId, publicAnonKey } from '/utils/supabase/info';
 
 export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || `https://${projectId}.supabase.co`;
 export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || publicAnonKey;
+export const supabaseFunctionAnonKey = publicAnonKey;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
