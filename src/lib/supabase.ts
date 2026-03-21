@@ -71,8 +71,10 @@ export interface OrderItem {
   customization?: {
     preparationOptionId?: string;
     premiumAddOnId?: string;
+    sizeOptionId?: string;
     dietaryOptionId?: string;
     alcoholChoiceId?: string;
+    tiramisuSizeId?: string;
     pureAlcoholMl?: number;
     estimatedFinalAbvPercent?: number;
   };

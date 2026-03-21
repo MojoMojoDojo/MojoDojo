@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../../lib/api';
 import type { Order } from '../../../lib/supabase';
-import { Button } from '../../components/ui/button';
 import {
   Select,
   SelectContent,
@@ -11,27 +10,26 @@ import {
   SelectValue,
 } from '../../components/ui/select';
 import { toast } from 'sonner';
+import {
+  MAIN_ORDER_STATUS_LABELS,
+  toMainOrderStatus,
+  type MainOrderStatus,
+} from '../../lib/adminOperations';
 
-const STATUS_LABELS: Record<string, string> = {
-  all: 'All',
-  request_received: 'Request received',
-  under_review: 'Under review',
-  accepted: 'Accepted',
-  rejected: 'Rejected',
-  ready_for_pickup: 'Ready for pickup',
-  out_for_delivery: 'Out for delivery',
-  completed: 'Completed',
-  pending: 'Pending (legacy)',
-  confirmed: 'Confirmed (legacy)',
-  in_preparation: 'In preparation (legacy)',
-  cancelled: 'Cancelled (legacy)',
-};
+const ORDER_FILTERS: MainOrderStatus[] = ['all', 'request_received', 'under_review', 'accepted', 'rejected'];
+
+const MAIN_STATUS_OPTIONS: Exclude<MainOrderStatus, 'all'>[] = [
+  'request_received',
+  'under_review',
+  'accepted',
+  'rejected',
+];
 
 export function OrdersManagement() {
   const { accessToken } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<string>('all');
+  const [filter, setFilter] = useState<MainOrderStatus>('all');
 
   useEffect(() => {
     loadOrders();
@@ -51,11 +49,11 @@ export function OrdersManagement() {
     }
   }
 
-  async function updateOrderStatus(orderId: string, newStatus: string) {
+  async function updateOrderStatus(orderId: string, newStatus: Exclude<MainOrderStatus, 'all'>) {
     if (!accessToken) return;
 
     try {
-      await api.orders.update(orderId, { status: newStatus as any }, accessToken);
+      await api.orders.update(orderId, { status: newStatus }, accessToken);
       toast.success('Order status updated');
       loadOrders();
     } catch (error) {
@@ -64,9 +62,9 @@ export function OrdersManagement() {
     }
   }
 
-  const filteredOrders = filter === 'all' 
-    ? orders 
-    : orders.filter(o => o.status === filter);
+  const filteredOrders = filter === 'all'
+    ? orders
+    : orders.filter((order) => toMainOrderStatus(order.status) === filter);
 
   return (
     <div className="space-y-6">
@@ -78,20 +76,7 @@ export function OrdersManagement() {
 
       {/* Filters */}
       <div className="flex gap-4">
-        {[
-          'all',
-          'request_received',
-          'under_review',
-          'accepted',
-          'rejected',
-          'ready_for_pickup',
-          'out_for_delivery',
-          'completed',
-          'pending',
-          'confirmed',
-          'in_preparation',
-          'cancelled',
-        ].map((status) => (
+        {ORDER_FILTERS.map((status) => (
           <button
             key={status}
             onClick={() => setFilter(status)}
@@ -101,7 +86,7 @@ export function OrdersManagement() {
                 : 'bg-brand-dark-gray text-brand-light-gray hover:bg-brand-gray hover:text-brand-gold'
             }`}
           >
-            {STATUS_LABELS[status] ?? status}
+            {MAIN_ORDER_STATUS_LABELS[status]}
           </button>
         ))}
       </div>
@@ -116,7 +101,7 @@ export function OrdersManagement() {
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="text-center py-12 text-brand-light-gray">
-            <p>No {filter !== 'all' ? filter : ''} orders found</p>
+            <p>No {filter !== 'all' ? MAIN_ORDER_STATUS_LABELS[filter].toLowerCase() : ''} orders found</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -175,34 +160,36 @@ export function OrdersManagement() {
 
                 <div className="flex items-center gap-4">
                   <Select
-                    value={order.status}
-                    onValueChange={(value) => updateOrderStatus(order.id, value)}
+                    value={toMainOrderStatus(order.status)}
+                    onValueChange={(value) => updateOrderStatus(order.id, value as Exclude<MainOrderStatus, 'all'>)}
                   >
                     <SelectTrigger className="w-48 bg-brand-charcoal border-brand-dark-gray text-brand-off-white">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-brand-charcoal border-brand-dark-gray text-brand-off-white">
-                      <SelectItem value="request_received">Request received</SelectItem>
-                      <SelectItem value="under_review">Under review</SelectItem>
-                      <SelectItem value="accepted">Accepted</SelectItem>
-                      <SelectItem value="rejected">Rejected</SelectItem>
-                      <SelectItem value="ready_for_pickup">Ready for pickup</SelectItem>
-                      <SelectItem value="out_for_delivery">Out for delivery</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="pending">Pending (legacy)</SelectItem>
-                      <SelectItem value="confirmed">Confirmed (legacy)</SelectItem>
-                      <SelectItem value="in_preparation">In preparation (legacy)</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      {MAIN_STATUS_OPTIONS.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {MAIN_ORDER_STATUS_LABELS[status]}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
 
                   <div className={`status-badge ${
-                    ['request_received', 'under_review', 'pending'].includes(order.status) ? 'status-pending' :
-                    order.status === 'completed' ? 'status-available' :
-                    'status-pending'
+                    ['request_received', 'under_review'].includes(toMainOrderStatus(order.status))
+                      ? 'status-pending'
+                      : toMainOrderStatus(order.status) === 'accepted'
+                        ? 'status-available'
+                        : 'status-sold-out'
                   }`}>
-                    {STATUS_LABELS[order.status] ?? order.status.replace('_', ' ')}
+                    {MAIN_ORDER_STATUS_LABELS[toMainOrderStatus(order.status)]}
                   </div>
+
+                  {toMainOrderStatus(order.status) !== order.status && (
+                    <div className="text-xs text-brand-light-gray">
+                      Sub-status: {order.status.replaceAll('_', ' ')}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

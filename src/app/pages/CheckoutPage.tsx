@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, Loader2, ShoppingBag, Trash2, ArrowLeft, Plus, Minus, CalendarClock, CalendarDays } from 'lucide-react';
+import { Check, Loader2, ShoppingBag, Trash2, ArrowLeft, Plus, Minus, CalendarClock, CalendarDays, MapPin } from 'lucide-react';
 import { format, isValid, parse } from 'date-fns';
 import { api } from '../../lib/api';
 import { useCart } from '../contexts/CartContext';
@@ -11,6 +11,7 @@ import { resolveCustomization } from '@/app/lib/productCustomization';
 import { getLocalizedProductName } from '../lib/productContent';
 import { Calendar } from '../components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { AddressAutocompleteInput } from '../components/AddressAutocompleteInput';
 
 function formatDateDigits(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 8);
@@ -25,15 +26,23 @@ function parseDateInput(value: string): Date | undefined {
   return format(parsed, 'yyyy/MM/dd') === value ? parsed : undefined;
 }
 
-const HOUR_OPTIONS = Array.from({ length: 13 }, (_, index) => {
-  const hour24 = 8 + index;
-  const hour12 = hour24 > 12 ? hour24 - 12 : hour24;
-  const period = hour24 >= 12 ? 'PM' : 'AM';
-  return {
-    value: `${String(hour24).padStart(2, '0')}:00`,
-    label: `${hour12}:00 ${period}`,
-  };
-});
+const PICKUP_ADDRESS = '90 rue Prince';
+
+function buildHourOptions(startHour24: number, endHour24: number) {
+  return Array.from({ length: endHour24 - startHour24 + 1 }, (_, index) => {
+    const hour24 = startHour24 + index;
+    const hour12 = hour24 > 12 ? hour24 - 12 : hour24;
+    const period = hour24 >= 12 ? 'PM' : 'AM';
+
+    return {
+      value: `${String(hour24).padStart(2, '0')}:00`,
+      label: `${hour12}:00 ${period}`,
+    };
+  });
+}
+
+const PICKUP_HOUR_OPTIONS = buildHourOptions(8, 20);
+const DELIVERY_HOUR_OPTIONS = buildHourOptions(16, 23);
 
 export function CheckoutPage() {
   const { cart, updateQuantity, removeFromCart, clearCart, total, itemCount } = useCart();
@@ -59,6 +68,15 @@ export function CheckoutPage() {
     now.setHours(0, 0, 0, 0);
     return now;
   }, []);
+  const availableHourOptions = deliveryType === 'pickup' ? PICKUP_HOUR_OPTIONS : DELIVERY_HOUR_OPTIONS;
+
+  useEffect(() => {
+    if (!preferredTime) return;
+    const isStillAvailable = availableHourOptions.some(option => option.value === preferredTime);
+    if (!isStillAvailable) {
+      setPreferredTime('');
+    }
+  }, [availableHourOptions, preferredTime]);
 
   function buildPreferredDatetime(): string | undefined {
     if (!selectedDate || !preferredTime) return undefined;
@@ -288,9 +306,24 @@ export function CheckoutPage() {
                   ))}
                 </div>
 
-                <AnimatePresence>
-                  {deliveryType === 'delivery' && (
+                <AnimatePresence mode="wait">
+                  {deliveryType === 'pickup' ? (
                     <motion.div
+                      key="pickup-location"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="rounded-xl border border-brand-gold/50 bg-brand-gold/10 px-4 py-3"
+                    >
+                      <p className="text-xs uppercase tracking-wide text-brand-gold">{t.checkout.pickupLocationLabel}</p>
+                      <p className="text-sm text-white mt-1 flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-brand-gold" />
+                        {PICKUP_ADDRESS}
+                      </p>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="delivery-address"
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
@@ -298,13 +331,15 @@ export function CheckoutPage() {
                       <label className="block text-sm font-medium text-gray-300 mb-1.5">
                         {t.checkout.deliveryAddress} <span className="text-brand-gold">*</span>
                       </label>
-                      <input
-                        type="text"
+                      <AddressAutocompleteInput
                         value={deliveryAddress}
-                        onChange={e => setDeliveryAddress(e.target.value)}
+                        onChange={setDeliveryAddress}
                         required
+                        language={language}
                         placeholder={t.checkout.deliveryAddressPlaceholder}
-                        className="w-full bg-black border-2 border-zinc-700 text-white rounded-lg px-4 py-2.5 focus:border-brand-gold focus:outline-none transition-colors"
+                        startTypingText={t.checkout.addressAutocompleteStart}
+                        loadingText={t.checkout.addressAutocompleteLoading}
+                        noResultsText={t.checkout.addressAutocompleteNoResults}
                       />
                     </motion.div>
                   )}
@@ -364,12 +399,15 @@ export function CheckoutPage() {
                         <option value="" className="bg-zinc-900 text-gray-400">
                           {t.checkout.preferredTimePlaceholder}
                         </option>
-                        {HOUR_OPTIONS.map((option) => (
+                        {availableHourOptions.map((option) => (
                           <option key={option.value} value={option.value} className="bg-zinc-900 text-white">
                             {option.label}
                           </option>
                         ))}
                       </select>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        {deliveryType === 'pickup' ? t.checkout.pickupTimeWindow : t.checkout.deliveryTimeWindow}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -432,6 +470,7 @@ export function CheckoutPage() {
                     const selected = resolveCustomization(item.product, {
                       preparationOptionId: item.customization.preparationOptionId ?? item.customization.dietaryOptionId,
                       premiumAddOnId: item.customization.premiumAddOnId ?? item.customization.alcoholChoiceId,
+                      sizeOptionId: item.customization.sizeOptionId ?? item.customization.tiramisuSizeId,
                     });
 
                     return (
@@ -439,6 +478,11 @@ export function CheckoutPage() {
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-white text-sm truncate">{getLocalizedProductName(item.product, language)}</p>
                           <p className="text-gray-400 text-xs mt-0.5">${item.unitPrice.toFixed(2)} {t.checkout.each}</p>
+                          {selected.sizeOptionId && (
+                            <p className="text-gray-500 text-xs mt-0.5">
+                              {selected.sizeOptionId === 'small' ? t.order.sizes.smallTiramisu : t.order.sizes.largeTiramisu}
+                            </p>
+                          )}
                           {selected.premiumAddOn && (
                             <p className="text-gray-500 text-xs mt-0.5">
                               {t.order.options[selected.premiumAddOn.labelKey as keyof typeof t.order.options]}

@@ -1,20 +1,38 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../../lib/api';
 import { motion } from 'motion/react';
 import { 
   ShoppingCart, 
-  DollarSign, 
-  Package, 
+  DollarSign,
   AlertCircle,
-  TrendingUp 
+  CirclePlus,
+  CircleMinus,
+  ClipboardList,
 } from 'lucide-react';
 import type { Order } from '../../../lib/supabase';
+import { Link } from 'react-router';
+import {
+  buildIngredientWorksheet,
+  MAIN_ORDER_STATUS_LABELS,
+  QUICK_ADD_SKUS,
+  toMainOrderStatus,
+} from '../../lib/adminOperations';
+import { Button } from '../../components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../../components/ui/table';
 
 export function AdminDashboard() {
   const { user, accessToken } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [quickAddCounts, setQuickAddCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     loadData();
@@ -35,12 +53,15 @@ export function AdminDashboard() {
 
   const stats = {
     totalOrders: orders.length,
-    pendingOrders: orders.filter(o => ['request_received', 'under_review', 'pending'].includes(o.status)).length,
-    completedOrders: orders.filter(o => o.status === 'completed').length,
+    requestReceived: orders.filter((o) => toMainOrderStatus(o.status) === 'request_received').length,
+    underReview: orders.filter((o) => toMainOrderStatus(o.status) === 'under_review').length,
+    accepted: orders.filter((o) => toMainOrderStatus(o.status) === 'accepted').length,
     totalRevenue: orders
-      .filter(o => o.status === 'completed')
-      .reduce((sum, o) => sum + o.total, 0)
+      .filter((o) => toMainOrderStatus(o.status) === 'accepted')
+      .reduce((sum, o) => sum + o.total, 0),
   };
+
+  const worksheet = useMemo(() => buildIngredientWorksheet(quickAddCounts), [quickAddCounts]);
 
   const statCards = [
     {
@@ -51,21 +72,21 @@ export function AdminDashboard() {
       bgColor: 'bg-brand-gold-subtle'
     },
     {
-      title: 'Pending',
-      value: stats.pendingOrders,
+      title: 'Request Received',
+      value: stats.requestReceived,
       icon: AlertCircle,
       color: 'text-yellow-500',
       bgColor: 'bg-yellow-500/10'
     },
     {
-      title: 'Completed',
-      value: stats.completedOrders,
-      icon: Package,
+      title: 'Under Review',
+      value: stats.underReview,
+      icon: ClipboardList,
       color: 'text-green-500',
       bgColor: 'bg-green-500/10'
     },
     {
-      title: 'Revenue',
+      title: 'Accepted Revenue',
       value: `$${stats.totalRevenue.toFixed(2)}`,
       icon: DollarSign,
       color: 'text-brand-gold',
@@ -73,13 +94,27 @@ export function AdminDashboard() {
     }
   ];
 
+  function incrementSku(skuId: string, amount: number) {
+    setQuickAddCounts((current) => {
+      const next = Math.max(0, (current[skuId] ?? 0) + amount);
+      return {
+        ...current,
+        [skuId]: next,
+      };
+    });
+  }
+
+  function resetWorksheet() {
+    setQuickAddCounts({});
+  }
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold mb-2">
           Welcome back, <span className="gold-accent">{user?.name}</span>
         </h1>
-        <p className="text-brand-light-gray">Here's what's happening with MojoDojo today</p>
+        <p className="text-brand-light-gray">Run today&apos;s operations from one place</p>
       </div>
 
       {/* Stats Grid */}
@@ -106,13 +141,117 @@ export function AdminDashboard() {
         })}
       </div>
 
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+        <div className="premium-card p-6 xl:col-span-2">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-semibold golden-line pl-4">Quick Add Production</h2>
+            <Button variant="outline" className="btn-outline-gold" onClick={resetWorksheet}>
+              Reset
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            {QUICK_ADD_SKUS.map((sku) => (
+              <div
+                key={sku.id}
+                className="p-4 bg-brand-charcoal rounded-lg border border-brand-dark-gray"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="font-semibold">{sku.label}</p>
+                    <p className="text-xs text-brand-light-gray">Revenue/unit: ${sku.revenuePerUnit.toFixed(2)}</p>
+                  </div>
+                  <p className="text-lg font-bold gold-accent">{quickAddCounts[sku.id] ?? 0}</p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="btn-outline-gold"
+                    onClick={() => incrementSku(sku.id, -1)}
+                  >
+                    <CircleMinus className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="btn-primary-gold"
+                    onClick={() => incrementSku(sku.id, 1)}
+                  >
+                    <CirclePlus className="w-4 h-4 mr-1" />
+                    +1 {sku.label}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="premium-card p-6 xl:col-span-3">
+          <div className="mb-6">
+            <h2 className="text-2xl font-semibold golden-line pl-4">Ingredient Worksheet</h2>
+            <p className="text-sm text-brand-light-gray mt-2">
+              Live estimate from quick-add quantities. Replace with real recipe/cost tables when backend is connected.
+            </p>
+          </div>
+
+          {worksheet.rows.length === 0 ? (
+            <div className="text-center py-12 text-brand-light-gray">
+              <p>Add products with quick-add to generate ingredient requirements.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="border-brand-dark-gray hover:bg-transparent">
+                  <TableHead>Ingredient</TableHead>
+                  <TableHead>Unit</TableHead>
+                  <TableHead className="text-right">Qty Required</TableHead>
+                  <TableHead className="text-right">Unit Cost</TableHead>
+                  <TableHead className="text-right">Extended Cost</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {worksheet.rows.map((row) => (
+                  <TableRow key={row.ingredientId} className="border-brand-dark-gray hover:bg-brand-charcoal">
+                    <TableCell>{row.ingredientName}</TableCell>
+                    <TableCell>{row.unit}</TableCell>
+                    <TableCell className="text-right">{row.quantityRequired.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">${row.unitCost.toFixed(4)}</TableCell>
+                    <TableCell className="text-right">${row.extendedCost.toFixed(2)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-lg bg-brand-charcoal border border-brand-dark-gray">
+              <p className="text-sm text-brand-light-gray mb-1">Total Ingredient Cost</p>
+              <p className="text-2xl font-bold">${worksheet.totals.totalIngredientCost.toFixed(2)}</p>
+            </div>
+            <div className="p-4 rounded-lg bg-brand-charcoal border border-brand-dark-gray">
+              <p className="text-sm text-brand-light-gray mb-1">Total Revenue</p>
+              <p className="text-2xl font-bold gold-accent">${worksheet.totals.totalRevenue.toFixed(2)}</p>
+            </div>
+            <div className="p-4 rounded-lg bg-brand-charcoal border border-brand-dark-gray">
+              <p className="text-sm text-brand-light-gray mb-1">Estimated Gross Profit</p>
+              <p className="text-2xl font-bold ${worksheet.totals.estimatedGrossProfit >= 0 ? 'text-green-400' : 'text-red-400'}">
+                ${worksheet.totals.estimatedGrossProfit.toFixed(2)}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Recent Orders */}
       <div className="premium-card p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-semibold golden-line pl-4">Recent Orders</h2>
-          <a href="/admin/dashboard/orders" className="text-brand-gold hover:underline text-sm">
+          <Link to="/admin/dashboard/orders" className="text-brand-gold hover:underline text-sm">
             View All
-          </a>
+          </Link>
         </div>
 
         {loading ? (
@@ -146,11 +285,13 @@ export function AdminDashboard() {
                   </p>
                 </div>
                 <div className={`status-badge ${
-                  ['request_received', 'under_review', 'pending'].includes(order.status) ? 'status-pending' :
-                  order.status === 'completed' ? 'status-available' :
-                  'status-pending'
+                  ['request_received', 'under_review'].includes(toMainOrderStatus(order.status))
+                    ? 'status-pending'
+                    : toMainOrderStatus(order.status) === 'accepted'
+                      ? 'status-available'
+                      : 'status-sold-out'
                 }`}>
-                  {order.status}
+                  {MAIN_ORDER_STATUS_LABELS[toMainOrderStatus(order.status)]}
                 </div>
               </div>
             ))}
@@ -160,23 +301,23 @@ export function AdminDashboard() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <a href="/admin/dashboard/orders" className="premium-card p-6 hover:border-brand-gold transition-colors group">
+        <Link to="/admin/dashboard/orders" className="premium-card p-6 hover:border-brand-gold transition-colors group">
           <ShoppingCart className="w-8 h-8 text-brand-gold mb-3 group-hover:scale-110 transition-transform" />
           <h3 className="font-semibold mb-1">Manage Orders</h3>
-          <p className="text-sm text-brand-light-gray">View and update order status</p>
-        </a>
+          <p className="text-sm text-brand-light-gray">Review requests and update the main status</p>
+        </Link>
 
-        <a href="/admin/dashboard/products" className="premium-card p-6 hover:border-brand-gold transition-colors group">
-          <Package className="w-8 h-8 text-brand-gold mb-3 group-hover:scale-110 transition-transform" />
+        <Link to="/admin/dashboard/products" className="premium-card p-6 hover:border-brand-gold transition-colors group">
+          <ClipboardList className="w-8 h-8 text-brand-gold mb-3 group-hover:scale-110 transition-transform" />
           <h3 className="font-semibold mb-1">Products</h3>
-          <p className="text-sm text-brand-light-gray">Manage menu and inventory</p>
-        </a>
+          <p className="text-sm text-brand-light-gray">Maintain product details, availability, and recipe links</p>
+        </Link>
 
-        <a href="/admin/dashboard/financial" className="premium-card p-6 hover:border-brand-gold transition-colors group">
-          <TrendingUp className="w-8 h-8 text-brand-gold mb-3 group-hover:scale-110 transition-transform" />
-          <h3 className="font-semibold mb-1">Financial Overview</h3>
-          <p className="text-sm text-brand-light-gray">Revenue and analytics</p>
-        </a>
+        <Link to="/admin/dashboard/inventory" className="premium-card p-6 hover:border-brand-gold transition-colors group">
+          <AlertCircle className="w-8 h-8 text-brand-gold mb-3 group-hover:scale-110 transition-transform" />
+          <h3 className="font-semibold mb-1">Inventory</h3>
+          <p className="text-sm text-brand-light-gray">Check stock and refill priorities</p>
+        </Link>
       </div>
     </div>
   );

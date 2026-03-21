@@ -5,6 +5,7 @@ import type { Product } from '../../lib/supabase';
 import { useCart } from '../contexts/CartContext';
 import {
   getPremiumAddOns,
+  getTiramisuSizeOptions,
   resolveCustomization,
 } from '@/app/lib/productCustomization';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -29,15 +30,21 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
   const [quantity, setQuantity] = useState(1);
   const [preparationOptionId, setPreparationOptionId] = useState<string>('standard');
   const [premiumAddOnId, setPremiumAddOnId] = useState<string | undefined>(undefined);
+  const [sizeOptionId, setSizeOptionId] = useState<string | undefined>(undefined);
   const [hasAcceptedAlcoholNotice, setHasAcceptedAlcoholNotice] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !product) return;
+
     setQuantity(1);
     setPreparationOptionId('standard');
     setPremiumAddOnId(undefined);
+
+    const defaultSizeOption = getTiramisuSizeOptions(product).find((option) => option.id === 'large');
+    setSizeOptionId(defaultSizeOption?.id);
+
     setHasAcceptedAlcoholNotice(false);
-  }, [isOpen, product?.id]);
+  }, [isOpen, product]);
 
   const allergenLabelMap = {
     dairy: t.order.allergenTags.dairy,
@@ -51,15 +58,16 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
   const currentProduct = product;
 
   const premiumAddOns = getPremiumAddOns(currentProduct);
-  const resolved = resolveCustomization(currentProduct, { preparationOptionId, premiumAddOnId });
-  const productImage = getProductImage(currentProduct);
+  const tiramisuSizeOptions = getTiramisuSizeOptions(currentProduct);
+  const resolved = resolveCustomization(currentProduct, { preparationOptionId, premiumAddOnId, sizeOptionId });
+  const productImage = getProductImage(currentProduct, { sizeOptionId: resolved.sizeOptionId });
 
   const unitPrice = currentProduct.price + resolved.extraPrice;
   const totalPrice = unitPrice * quantity;
 
   const localizedName = getLocalizedProductName(currentProduct, language);
   const localizedDescription = getLocalizedProductLongDescription(currentProduct, language);
-  const localizedServingSize = getLocalizedServingSize(currentProduct, language);
+  const localizedServingSize = getLocalizedServingSize(currentProduct, language, resolved.sizeOptionId);
   const allergenTags = getAllergenTags(currentProduct);
 
   function optionLabel(labelKey: string): string {
@@ -72,7 +80,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
 
   function handleAddToCart() {
     for (let i = 0; i < quantity; i += 1) {
-      addToCart(currentProduct, { preparationOptionId, premiumAddOnId });
+      addToCart(currentProduct, { preparationOptionId, premiumAddOnId, sizeOptionId });
     }
     onClose();
   }
@@ -143,6 +151,35 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                     <p className="text-gray-300 leading-relaxed mt-4">{localizedDescription}</p>
 
                     <div className="mt-5 grid grid-cols-1 gap-3">
+                      {tiramisuSizeOptions.length > 0 && (
+                        <section className="rounded-xl border border-zinc-700 bg-black/20 p-4">
+                          <h3 className="text-base font-semibold text-white mb-3">{t.order.modal.selectSize}</h3>
+                          <div className="grid grid-cols-2 gap-2">
+                            {tiramisuSizeOptions.map((sizeOption) => {
+                              const isSelected = resolved.sizeOptionId === sizeOption.id;
+                              const sizeLabel = sizeOption.id === 'small' ? t.order.sizes.smallTiramisu : t.order.sizes.largeTiramisu;
+                              const absolutePrice = currentProduct.price + sizeOption.extraPrice;
+
+                              return (
+                                <button
+                                  key={sizeOption.id}
+                                  type="button"
+                                  onClick={() => setSizeOptionId(sizeOption.id)}
+                                  className={`rounded-lg border p-3 text-left transition-colors ${
+                                    isSelected
+                                      ? 'border-brand-gold bg-brand-gold-subtle'
+                                      : 'border-zinc-700 bg-zinc-900 hover:border-zinc-500'
+                                  }`}
+                                >
+                                  <p className="text-sm font-medium text-white">{sizeLabel}</p>
+                                  <p className="text-xs text-brand-gold mt-1">${absolutePrice.toFixed(2)}</p>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </section>
+                      )}
+
                       <div className="rounded-xl border border-zinc-700 bg-black/25 p-3">
                         <p className="text-xs text-zinc-400 uppercase tracking-wide">{t.order.modal.servingSize}</p>
                         <p className="text-sm text-white mt-1">{localizedServingSize ?? t.order.modal.notSpecified}</p>
@@ -226,7 +263,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                               />
                               <span>
                                 {t.order.modal.alcoholConfirm}{' '}
-                                <a href="/terms" className="text-brand-gold hover:underline">
+                                <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-brand-gold hover:underline">
                                   {t.order.modal.termsLinkLabel}
                                 </a>
                               </span>

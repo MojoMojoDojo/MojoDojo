@@ -2,6 +2,7 @@ import type { Product } from '../../lib/supabase';
 import biscoffCheesecakeImage from '../../assets/BiscoffCheescake.png';
 import brownieCheesecakeImage from '../../assets/BrownieCheescake.png';
 import tiramisuTrayImage from '../../assets/TiramisuTray.png';
+import tiramisuTraySmallImage from '../../assets/TiramisuTraySmall.png';
 
 const PRODUCT_FALLBACK_IMAGES: Record<string, string> = {
   prod_1: biscoffCheesecakeImage,
@@ -9,7 +10,18 @@ const PRODUCT_FALLBACK_IMAGES: Record<string, string> = {
   prod_3: tiramisuTrayImage,
 };
 
-export function getProductImage(product: Product): string {
+interface ProductImageOptions {
+  sizeOptionId?: string;
+}
+
+export function getProductImage(product: Product, options?: ProductImageOptions): string {
+  if (
+    options?.sizeOptionId === 'small' &&
+    (product.id === 'prod_3' || product.name.toLowerCase().includes('tiramisu') || product.name_fr?.toLowerCase().includes('tiramisu'))
+  ) {
+    return tiramisuTraySmallImage;
+  }
+
   if (product.image_url) return product.image_url;
 
   const lowerName = product.name.toLowerCase();

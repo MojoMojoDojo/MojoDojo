@@ -17,17 +17,26 @@ export interface PremiumAddOn {
   extraPrice: number;
 }
 
+export interface TiramisuSizeOption {
+  id: 'small' | 'large';
+  labelKey: 'smallTiramisu' | 'largeTiramisu';
+  extraPrice: number;
+}
+
 export interface ProductCustomizationInput {
   preparationOptionId?: string;
   premiumAddOnId?: string;
+  sizeOptionId?: string;
   // Legacy keys for backward compatibility with existing localStorage data.
   dietaryOptionId?: string;
   alcoholChoiceId?: string;
+  tiramisuSizeId?: string;
 }
 
 export interface ResolvedCustomization {
   preparationOption: PreparationOption;
   premiumAddOn?: PremiumAddOn;
+  sizeOptionId?: TiramisuSizeOption['id'];
   extraPrice: number;
   key: string;
   pureAlcoholMl: number;
@@ -61,10 +70,28 @@ const TIRAMISU_PREMIUM_ADDONS: PremiumAddOn[] = [
   },
 ];
 
+const TIRAMISU_SIZE_OPTIONS: TiramisuSizeOption[] = [
+  {
+    id: 'small',
+    labelKey: 'smallTiramisu',
+    // Product base price is the large tray price. Small applies a discount from base.
+    extraPrice: -15,
+  },
+  {
+    id: 'large',
+    labelKey: 'largeTiramisu',
+    extraPrice: 0,
+  },
+];
+
 function isTiramisu(product: Product): boolean {
   const lowerName = product.name.toLowerCase();
   const lowerNameFr = product.name_fr?.toLowerCase() ?? '';
   return product.id === 'prod_3' || lowerName.includes('tiramisu') || lowerNameFr.includes('tiramisu');
+}
+
+export function isTiramisuProduct(product: Product): boolean {
+  return isTiramisu(product);
 }
 
 export function getPreparationOptions(_product: Product): PreparationOption[] {
@@ -75,13 +102,19 @@ export function getPremiumAddOns(product: Product): PremiumAddOn[] {
   return isTiramisu(product) ? TIRAMISU_PREMIUM_ADDONS : [];
 }
 
+export function getTiramisuSizeOptions(product: Product): TiramisuSizeOption[] {
+  return isTiramisu(product) ? TIRAMISU_SIZE_OPTIONS : [];
+}
+
 function normalizeSelection(input?: ProductCustomizationInput): {
   preparationOptionId?: string;
   premiumAddOnId?: string;
+  sizeOptionId?: string;
 } {
   return {
     preparationOptionId: input?.preparationOptionId ?? input?.dietaryOptionId,
     premiumAddOnId: input?.premiumAddOnId ?? input?.alcoholChoiceId,
+    sizeOptionId: input?.sizeOptionId ?? input?.tiramisuSizeId,
   };
 }
 
@@ -97,6 +130,9 @@ export function resolveCustomization(
   const premiumAddOns = getPremiumAddOns(product);
   const selectedPremiumAddOn = premiumAddOns.find(addOn => addOn.id === normalized.premiumAddOnId);
 
+  const sizeOptions = getTiramisuSizeOptions(product);
+  const selectedSizeOption = sizeOptions.find(option => option.id === normalized.sizeOptionId) ?? sizeOptions.find(option => option.id === 'large');
+
   const pureAlcoholMl = selectedPremiumAddOn
     ? (selectedPremiumAddOn.addedMl * selectedPremiumAddOn.abvPercent) / 100
     : 0;
@@ -104,12 +140,13 @@ export function resolveCustomization(
     ? Number(((pureAlcoholMl / BASE_DESSERT_ML) * 100).toFixed(2))
     : 0;
 
-  const extraPrice = selectedPreparation.extraPrice + (selectedPremiumAddOn?.extraPrice ?? 0);
-  const key = `${product.id}|prep:${selectedPreparation.id}|addon:${selectedPremiumAddOn?.id ?? 'none'}`;
+  const extraPrice = selectedPreparation.extraPrice + (selectedPremiumAddOn?.extraPrice ?? 0) + (selectedSizeOption?.extraPrice ?? 0);
+  const key = `${product.id}|prep:${selectedPreparation.id}|addon:${selectedPremiumAddOn?.id ?? 'none'}|size:${selectedSizeOption?.id ?? 'default'}`;
 
   return {
     preparationOption: selectedPreparation,
     premiumAddOn: selectedPremiumAddOn,
+    sizeOptionId: selectedSizeOption?.id,
     extraPrice,
     key,
     pureAlcoholMl,
@@ -118,5 +155,10 @@ export function resolveCustomization(
 }
 
 export function isDefaultCustomizationKey(key: string): boolean {
-  return key.endsWith('|prep:standard|addon:none') || key.endsWith('|diet:standard|alc:none');
+  return (
+    key.endsWith('|prep:standard|addon:none|size:large') ||
+    key.endsWith('|prep:standard|addon:none|size:default') ||
+    key.endsWith('|prep:standard|addon:none') ||
+    key.endsWith('|diet:standard|alc:none')
+  );
 }

@@ -105,6 +105,17 @@ function localized(field: LocalizedField, language: Language): string {
   return language === 'fr' ? field.fr : field.en;
 }
 
+const TIRAMISU_SIZE_SERVING: Record<'small' | 'large', LocalizedField> = {
+  small: {
+    en: '6 pieces',
+    fr: '6 morceaux',
+  },
+  large: {
+    en: '12 pieces',
+    fr: '12 morceaux',
+  },
+};
+
 export function getLocalizedProductName(product: Product, language: Language): string {
   if (language === 'fr' && product.name_fr) return product.name_fr;
   if (language === 'en' && product.name) return product.name;
@@ -143,7 +154,14 @@ export function getLocalizedCategory(product: Product, language: Language): stri
   return config ? localized(config.category, language) : product.category;
 }
 
-export function getLocalizedServingSize(product: Product, language: Language): string | undefined {
+export function getLocalizedServingSize(product: Product, language: Language, sizeOptionId?: string): string | undefined {
+  if (
+    (product.id === 'prod_3' || product.name.toLowerCase().includes('tiramisu') || product.name_fr?.toLowerCase().includes('tiramisu')) &&
+    (sizeOptionId === 'small' || sizeOptionId === 'large')
+  ) {
+    return localized(TIRAMISU_SIZE_SERVING[sizeOptionId], language);
+  }
+
   if (language === 'fr' && product.serving_size_fr) return product.serving_size_fr;
   if (language === 'en' && product.serving_size) return product.serving_size;
 

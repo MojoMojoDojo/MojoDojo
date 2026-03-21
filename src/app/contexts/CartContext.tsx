@@ -11,9 +11,11 @@ export interface CartItem {
   customization: {
     preparationOptionId: string;
     premiumAddOnId?: string;
+    sizeOptionId?: string;
     // Legacy fields kept for compatibility with previously persisted carts.
     dietaryOptionId?: string;
     alcoholChoiceId?: string;
+    tiramisuSizeId?: string;
     pureAlcoholMl?: number;
     estimatedFinalAbvPercent?: number;
   };
@@ -44,6 +46,7 @@ function normalizeCart(stored: unknown): CartItem[] {
       const fallbackResolved = resolveCustomization(item.product, {
         preparationOptionId: item.customization?.preparationOptionId ?? item.customization?.dietaryOptionId,
         premiumAddOnId: item.customization?.premiumAddOnId ?? item.customization?.alcoholChoiceId,
+        sizeOptionId: item.customization?.sizeOptionId ?? item.customization?.tiramisuSizeId,
       });
 
       const customizationKey = item.customizationKey ?? fallbackResolved.key;
@@ -60,8 +63,10 @@ function normalizeCart(stored: unknown): CartItem[] {
           preparationOptionId:
             item.customization?.preparationOptionId ?? item.customization?.dietaryOptionId ?? fallbackResolved.preparationOption.id,
           premiumAddOnId: item.customization?.premiumAddOnId ?? item.customization?.alcoholChoiceId,
+          sizeOptionId: item.customization?.sizeOptionId ?? item.customization?.tiramisuSizeId ?? fallbackResolved.sizeOptionId,
           dietaryOptionId: item.customization?.dietaryOptionId,
           alcoholChoiceId: item.customization?.alcoholChoiceId,
+          tiramisuSizeId: item.customization?.tiramisuSizeId,
           pureAlcoholMl: item.customization?.pureAlcoholMl ?? fallbackResolved.pureAlcoholMl,
           estimatedFinalAbvPercent:
             item.customization?.estimatedFinalAbvPercent ?? fallbackResolved.estimatedFinalAbvPercent,
@@ -110,8 +115,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
           customization: {
             preparationOptionId: resolved.preparationOption.id,
             premiumAddOnId: resolved.premiumAddOn?.id,
+            sizeOptionId: resolved.sizeOptionId,
             dietaryOptionId: resolved.preparationOption.id,
             alcoholChoiceId: resolved.premiumAddOn?.id,
+            tiramisuSizeId: resolved.sizeOptionId,
             pureAlcoholMl: resolved.pureAlcoholMl || undefined,
             estimatedFinalAbvPercent: resolved.estimatedFinalAbvPercent || undefined,
           },
