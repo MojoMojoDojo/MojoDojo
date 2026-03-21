@@ -107,8 +107,8 @@ function localized(field: LocalizedField, language: Language): string {
 
 const TIRAMISU_SIZE_SERVING: Record<'small' | 'large', LocalizedField> = {
   small: {
-    en: '6 pieces',
-    fr: '6 morceaux',
+    en: '4 pieces',
+    fr: '4 morceaux',
   },
   large: {
     en: '12 pieces',

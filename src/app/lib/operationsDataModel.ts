@@ -188,8 +188,8 @@ export const CORE_VARIANTS: ProductVariantModel[] = [
       fr: 'Tiramisu petit',
     },
     servingSize: {
-      en: 'Small (6 pieces)',
-      fr: 'Petit (6 morceaux)',
+      en: 'Small (4 pieces)',
+      fr: 'Petit (4 morceaux)',
     },
     price: 10,
     imageUrl: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9',
@@ -220,8 +220,8 @@ export const CORE_VARIANTS: ProductVariantModel[] = [
       fr: 'Tiramisu petit + Marsala',
     },
     servingSize: {
-      en: 'Small (6 pieces) with marsala',
-      fr: 'Petit (6 morceaux) avec marsala',
+      en: 'Small (4 pieces) with marsala',
+      fr: 'Petit (4 morceaux) avec marsala',
     },
     price: 15,
     imageUrl: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9',
