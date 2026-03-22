@@ -32,6 +32,8 @@ export const en = {
       subtitle: 'Crafted with Discipline',
       description:
         'Experience handcrafted desserts and trays made with precision, premium ingredients, and an unwavering commitment to quality. Montreal & Laval delivery.',
+      instagramCta: 'Our Instagram',
+      instagramAriaLabel: 'Visit our Instagram',
       cta: 'Order Now',
       ctaSecondary: 'Learn More',
       scrollAriaLabel: 'Scroll to Why MojoDojo',
@@ -335,6 +337,9 @@ export const en = {
     addressAutocompleteLoading: 'Searching addresses...',
     addressAutocompleteNoResults: 'No address suggestions found',
     preferredDateTime: 'Preferred Date / Time',
+    today: 'Today',
+    tomorrow: 'Tomorrow',
+    inTwoDays: 'In 2 days',
     preferredDate: 'Date',
     preferredDatePlaceholder: 'YYYY/MM/DD',
     openCalendar: 'Open calendar',

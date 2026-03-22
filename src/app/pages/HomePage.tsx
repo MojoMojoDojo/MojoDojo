@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { CheckCircle, ChevronDown, Clock, ShoppingBag, Star } from 'lucide-react';
+import { ArrowRight, CheckCircle, ChevronDown, Clock, Instagram, ShoppingBag, Star } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
@@ -49,6 +49,39 @@ export function HomePage() {
           />
           <div className="absolute inset-0 bg-gradient-to-b from-brand-black via-transparent to-brand-black"></div>
         </div>
+
+        <motion.a
+          href="https://www.instagram.com/mojomojo.dojo/"
+          target="_blank"
+          rel="noreferrer"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{
+            opacity: 1,
+            x: [0, 6, -5, 4, 0],
+            y: [0, -3, 4, -2, 0],
+            boxShadow: [
+              '0 0 0 rgba(59,130,246,0)',
+              '0 0 12px rgba(59,130,246,0.18)',
+              '0 0 0 rgba(59,130,246,0)',
+            ],
+          }}
+          transition={{
+            opacity: { duration: 0.55, delay: 0.45 },
+            x: { duration: 7.5, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' },
+            y: { duration: 6.2, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' },
+            boxShadow: { duration: 3.2, repeat: Infinity, repeatType: 'loop', ease: 'easeInOut' },
+          }}
+          className="absolute z-20 left-4 sm:left-7 md:left-12 lg:left-16 top-24 sm:top-28 md:top-32
+                     inline-flex items-center gap-1.5 rounded-full border border-blue-400/45 bg-black/55
+                     px-2.5 py-1.5 text-[11px] sm:text-xs font-medium text-blue-100 backdrop-blur-md
+                     transition-colors hover:text-white hover:border-blue-300/70"
+          aria-label={t.home.hero.instagramAriaLabel}
+        >
+          <span className="text-blue-300/80">→</span>
+          <Instagram className="w-3.5 h-3.5 text-blue-300" />
+          <span>{t.home.hero.instagramCta}</span>
+          <ArrowRight className="w-3 h-3 text-blue-300/90" />
+        </motion.a>
 
         {/* Content */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center pt-20">

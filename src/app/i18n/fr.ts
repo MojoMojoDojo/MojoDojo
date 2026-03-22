@@ -34,6 +34,8 @@ export const fr: Translations = {
       subtitle: 'Préparés avec Discipline',
       description:
         'Découvrez des desserts et plateaux faits à la main avec précision, des ingrédients premium et un engagement sans faille envers la qualité. Livraison Montréal & Laval.',
+      instagramCta: 'Notre Instagram',
+      instagramAriaLabel: 'Visiter notre Instagram',
       cta: 'Commander',
       ctaSecondary: 'En savoir plus',
       scrollAriaLabel: 'Défiler vers Pourquoi MojoDojo',
@@ -337,6 +339,9 @@ export const fr: Translations = {
     addressAutocompleteLoading: 'Recherche des adresses...',
     addressAutocompleteNoResults: 'Aucune suggestion d adresse trouvee',
     preferredDateTime: 'Date / heure préférée',
+    today: 'Aujourd’hui',
+    tomorrow: 'Demain',
+    inTwoDays: 'Dans 2 jours',
     preferredDate: 'Date',
     preferredDatePlaceholder: 'AAAA/MM/JJ',
     openCalendar: 'Ouvrir le calendrier',

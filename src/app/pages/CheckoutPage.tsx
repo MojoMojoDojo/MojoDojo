@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Check, Loader2, ShoppingBag, Trash2, ArrowLeft, Plus, Minus, CalendarClock, CalendarDays, MapPin } from 'lucide-react';
-import { format } from 'date-fns';
+import { addDays, format } from 'date-fns';
 import { api } from '../../lib/api';
 import { useCart } from '../contexts/CartContext';
 import { useNavigate } from 'react-router';
@@ -148,6 +148,22 @@ export function CheckoutPage() {
     return now;
   }, []);
   const availableHourOptions = deliveryType === 'pickup' ? PICKUP_HOUR_OPTIONS : DELIVERY_HOUR_OPTIONS;
+
+  function applyQuickDate(daysFromToday: number) {
+    const nextDate = addDays(today, daysFromToday);
+    setPreferredDateInput(format(nextDate, 'yyyy/MM/dd'));
+  }
+
+  function isQuickDateActive(daysFromToday: number): boolean {
+    if (!canonicalPreferredDate) return false;
+    return canonicalPreferredDate === format(addDays(today, daysFromToday), 'yyyy-MM-dd');
+  }
+
+  const quickDateButtons = [
+    { label: t.checkout.today, offset: 0 },
+    { label: t.checkout.tomorrow, offset: 1 },
+    { label: t.checkout.inTwoDays, offset: 2 },
+  ];
 
   useEffect(() => {
     if (!preferredTime) return;
@@ -434,9 +450,25 @@ export function CheckoutPage() {
                 </AnimatePresence>
 
                 <div className="space-y-3">
-                  <label className="block text-sm font-medium text-gray-300 mb-0.5">
-                    {t.checkout.preferredDateTime} <span className="text-brand-gold">*</span>
-                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="block text-sm font-medium text-gray-300 mb-0.5">
+                      {t.checkout.preferredDateTime} <span className="text-brand-gold">*</span>
+                    </label>
+                    {quickDateButtons.map((button) => (
+                      <button
+                        key={button.label}
+                        type="button"
+                        onClick={() => applyQuickDate(button.offset)}
+                        className={`text-xs rounded-full border px-2.5 py-1 transition-all ${
+                          isQuickDateActive(button.offset)
+                            ? 'border-brand-gold bg-brand-gold/20 text-brand-gold'
+                            : 'border-zinc-700 bg-zinc-900 text-gray-300 hover:border-zinc-500 hover:text-white'
+                        }`}
+                      >
+                        {button.label}
+                      </button>
+                    ))}
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_160px] gap-3">
                     <div>

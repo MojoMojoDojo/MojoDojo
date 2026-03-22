@@ -20,7 +20,7 @@ export function Footer() {
             </p>
             <div className="flex gap-4">
               <a
-                href="https://www.instagram.com/mojomojo.dojo"
+                href="https://www.instagram.com/mojomojo.dojo/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-brand-light-gray hover:text-brand-gold transition-colors"

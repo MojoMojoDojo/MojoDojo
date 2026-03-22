@@ -152,7 +152,7 @@ export function ContactPage() {
                     <div>
                         <h3 className="font-semibold mb-1">{t.contact.socialMedia}</h3>
                       <a
-                        href="https://instagram.com/mojodojo"
+                        href="https://www.instagram.com/mojomojo.dojo/"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-brand-light-gray hover:text-brand-gold transition-colors"
