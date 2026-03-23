@@ -5,6 +5,7 @@ import {
   RedirectAuthenticatedAdminEntry,
   RequireAuth,
   RequireAdmin,
+  RequireStaff,
 } from './components/admin/AdminRouteGuards';
 
 // Public Pages
@@ -60,9 +61,12 @@ export const router = createBrowserRouter([
               { index: true, Component: AdminDashboard },
               { path: "worker", Component: WorkerView },
               {
+                Component: RequireStaff,
+                children: [{ path: "orders", Component: OrdersManagement }],
+              },
+              {
                 Component: RequireAdmin,
                 children: [
-                  { path: "orders", Component: OrdersManagement },
                   { path: "products", Component: ProductsManagement },
                   { path: "inventory", Component: InventoryManagement },
                   { path: "financial", Component: FinancialOverview },

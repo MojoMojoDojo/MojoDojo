@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
 import type { UserRole } from '../../../lib/supabase';
+import { STAFF_ROLES } from '../../lib/accessControl';
 
 interface RequireAuthProps {
   allowedRoles?: UserRole[];
@@ -73,6 +74,10 @@ export function RequireAuth({ allowedRoles }: RequireAuthProps) {
 
 export function RequireAdmin() {
   return <RequireAuth allowedRoles={['admin']} />;
+}
+
+export function RequireStaff() {
+  return <RequireAuth allowedRoles={STAFF_ROLES} />;
 }
 
 export function RedirectAuthenticatedAdminEntry() {

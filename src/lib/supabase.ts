@@ -54,10 +54,12 @@ export interface Order {
   total: number;
   payment_method?: 'cash' | 'etranser' | 'arranged_after_approval' | 'online';
   payment_status?: 'pending' | 'paid' | 'arranged';
+  fulfillment_status?: 'not_started' | 'in_progress' | 'ready' | 'fulfilled';
   delivery_type: 'pickup' | 'delivery';
   delivery_address?: string;
   preferred_datetime?: string;
   notes?: string;
+  internal_notes?: string;
   items: OrderItem[];
   created_at: string;
   updated_at: string;

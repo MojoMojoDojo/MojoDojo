@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../../lib/api';
 import type { Order } from '../../../lib/supabase';
 import { ClipboardList, Clock, CheckCircle } from 'lucide-react';
+import { toMainOrderStatus } from '../../lib/adminOperations';
 
 export function WorkerView() {
   const { user, accessToken } = useAuth();
@@ -21,7 +22,12 @@ export function WorkerView() {
 
     try {
       const { orders: data } = await api.orders.getAll(accessToken);
-      setOrders(data.filter(o => o.status !== 'completed' && o.status !== 'cancelled'));
+      setOrders(
+        data.filter((order) => {
+          const status = toMainOrderStatus(order.status);
+          return status !== 'rejected' && (order.fulfillment_status ?? 'not_started') !== 'fulfilled';
+        }),
+      );
     } catch (error) {
       console.error('Failed to load orders:', error);
     } finally {
@@ -31,6 +37,14 @@ export function WorkerView() {
 
   const today = new Date().toDateString();
   const todayOrders = orders.filter(o => new Date(o.created_at).toDateString() === today);
+  const pendingCount = todayOrders.filter((order) => {
+    const status = toMainOrderStatus(order.status);
+    return status === 'request_received' || status === 'under_review';
+  }).length;
+  const inProgressCount = todayOrders.filter((order) => {
+    const fulfillment = order.fulfillment_status ?? 'not_started';
+    return fulfillment === 'in_progress' || fulfillment === 'ready';
+  }).length;
 
   return (
     <div className="space-y-6">
@@ -56,7 +70,7 @@ export function WorkerView() {
             <Clock className="w-8 h-8 text-yellow-500" />
             <h3 className="font-semibold">Pending</h3>
           </div>
-          <p className="text-4xl font-bold">{todayOrders.filter(o => o.status === 'pending').length}</p>
+          <p className="text-4xl font-bold">{pendingCount}</p>
         </div>
 
         <div className="premium-card p-6">
@@ -64,9 +78,7 @@ export function WorkerView() {
             <CheckCircle className="w-8 h-8 text-green-500" />
             <h3 className="font-semibold">In Progress</h3>
           </div>
-          <p className="text-4xl font-bold">
-            {todayOrders.filter(o => o.status === 'confirmed' || o.status === 'in_preparation').length}
-          </p>
+          <p className="text-4xl font-bold">{inProgressCount}</p>
         </div>
       </div>
 
@@ -106,11 +118,9 @@ export function WorkerView() {
                     )}
                   </div>
                   <div className={`status-badge ${
-                    order.status === 'pending' ? 'status-pending' :
-                    order.status === 'confirmed' ? 'status-available' :
-                    'status-pending'
+                    toMainOrderStatus(order.status) === 'accepted' ? 'status-available' : 'status-pending'
                   }`}>
-                    {order.status.replace('_', ' ')}
+                    {toMainOrderStatus(order.status).replace('_', ' ')}
                   </div>
                 </div>
 

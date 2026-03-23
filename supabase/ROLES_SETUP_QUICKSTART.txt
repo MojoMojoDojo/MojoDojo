@@ -20,7 +20,7 @@ set role = excluded.role,
 
 5. Expected access:
 - admin: full admin access (dashboard, orders, products, inventory, financial, user management)
-- worker: restricted access (dashboard + worker view only, cannot perform destructive actions)
+- worker: restricted access (dashboard, orders read-only, worker view; cannot perform sensitive updates)
 
 6. Dev-only login debug on /admin:
 - no Supabase session
@@ -32,3 +32,4 @@ Notes:
 - Optional demo init endpoint only runs if VITE_ENABLE_DEMO_INIT=true.
 - Admin can access and manage everything.
 - Worker can sign in and view, but cannot delete, change products/pricing, edit inventory costs, or change roles.
+- Worker can review order details but cannot accept/reject orders, change payment/fulfillment, or edit internal notes.

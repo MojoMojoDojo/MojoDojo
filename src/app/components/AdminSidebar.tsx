@@ -10,23 +10,26 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import logoImage from '../../assets/MojoDojoLogo.png';
-import type { UserRole } from '../../lib/supabase';
+import {
+  canAccessAdminSection,
+  type AdminSection,
+} from '../lib/accessControl';
 
 export function AdminSidebar() {
   const location = useLocation();
-  const { user, hasRole } = useAuth();
+  const { user } = useAuth();
 
   const navItems = [
-    { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'worker'] },
-    { path: '/admin/dashboard/orders', label: 'Orders', icon: ShoppingCart, roles: ['admin'] },
-    { path: '/admin/dashboard/products', label: 'Products', icon: Package, roles: ['admin'] },
-    { path: '/admin/dashboard/inventory', label: 'Inventory', icon: Warehouse, roles: ['admin'] },
-    { path: '/admin/dashboard/financial', label: 'Financial', icon: DollarSign, roles: ['admin'] },
-    { path: '/admin/dashboard/worker', label: 'Worker View', icon: ClipboardList, roles: ['admin', 'worker'] },
-    { path: '/admin/dashboard/users', label: 'User Management', icon: Users, roles: ['admin'] },
+    { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'dashboard' as AdminSection },
+    { path: '/admin/dashboard/orders', label: 'Orders', icon: ShoppingCart, section: 'orders' as AdminSection },
+    { path: '/admin/dashboard/products', label: 'Products', icon: Package, section: 'products' as AdminSection },
+    { path: '/admin/dashboard/inventory', label: 'Inventory', icon: Warehouse, section: 'inventory' as AdminSection },
+    { path: '/admin/dashboard/financial', label: 'Financial', icon: DollarSign, section: 'financial' as AdminSection },
+    { path: '/admin/dashboard/worker', label: 'Worker View', icon: ClipboardList, section: 'worker' as AdminSection },
+    { path: '/admin/dashboard/users', label: 'User Management', icon: Users, section: 'users' as AdminSection },
   ];
 
-  const visibleNavItems = navItems.filter((item) => hasRole(item.roles as UserRole[]));
+  const visibleNavItems = navItems.filter((item) => canAccessAdminSection(user?.role, item.section));
 
   return (
     <aside className="w-64 bg-brand-charcoal border-r border-brand-dark-gray flex-shrink-0">

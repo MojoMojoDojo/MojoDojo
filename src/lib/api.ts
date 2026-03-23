@@ -18,10 +18,12 @@ type OrderRow = {
   total: number;
   payment_method?: Order['payment_method'];
   payment_status?: Order['payment_status'];
+  fulfillment_status?: Order['fulfillment_status'];
   delivery_type: Order['delivery_type'];
   delivery_address?: string | null;
   preferred_datetime?: string | null;
   notes?: string | null;
+  internal_notes?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -58,10 +60,12 @@ function mapOrderRowsToOrders(orderRows: OrderRow[], itemRows: OrderItemRow[]): 
       total: row.total,
       payment_method: row.payment_method,
       payment_status: row.payment_status,
+      fulfillment_status: row.fulfillment_status,
       delivery_type: row.delivery_type,
       delivery_address: row.delivery_address ?? undefined,
       preferred_datetime: row.preferred_datetime ?? undefined,
       notes: row.notes ?? undefined,
+      internal_notes: row.internal_notes ?? undefined,
       items: (itemsByOrder.get(row.id) ?? []).map((item) => ({
         product_id: item.product_id,
         product_name: item.product_name,
@@ -145,12 +149,31 @@ export const api = {
         // Keep API compatible without forcing session changes.
       }
 
-      const { data: orderRows, error: ordersError } = await supabase
+      const richSelect =
+        'id, customer_name, customer_email, customer_phone, status, total, payment_method, payment_status, fulfillment_status, delivery_type, delivery_address, preferred_datetime, notes, internal_notes, created_at, updated_at';
+      const legacySelect =
+        'id, customer_name, customer_email, customer_phone, status, total, payment_method, payment_status, delivery_type, delivery_address, preferred_datetime, notes, created_at, updated_at';
+
+      let orderRows: any[] | null = null;
+      let ordersError: { message?: string } | null = null;
+
+      const richResponse = await supabase
         .from('orders')
-        .select(
-          'id, customer_name, customer_email, customer_phone, status, total, payment_method, payment_status, delivery_type, delivery_address, preferred_datetime, notes, created_at, updated_at',
-        )
+        .select(richSelect)
         .order('created_at', { ascending: false });
+
+      orderRows = richResponse.data;
+      ordersError = richResponse.error;
+
+      if (ordersError && /fulfillment_status|internal_notes/i.test(ordersError.message ?? '')) {
+        const legacyResponse = await supabase
+          .from('orders')
+          .select(legacySelect)
+          .order('created_at', { ascending: false });
+
+        orderRows = legacyResponse.data;
+        ordersError = legacyResponse.error;
+      }
 
       if (ordersError) {
         throw new Error(ordersError.message || 'Failed to fetch orders');
@@ -184,10 +207,12 @@ export const api = {
         total: order.total ?? 0,
         payment_method: order.payment_method ?? 'arranged_after_approval',
         payment_status: order.payment_status ?? 'arranged',
+        fulfillment_status: order.fulfillment_status ?? 'not_started',
         delivery_type: order.delivery_type ?? 'pickup',
         delivery_address: order.delivery_address ?? null,
         preferred_datetime: order.preferred_datetime ?? null,
         notes: order.notes ?? null,
+        internal_notes: order.internal_notes ?? null,
         created_at: now,
         updated_at: now,
       };
@@ -196,7 +221,7 @@ export const api = {
         .from('orders')
         .insert(orderPayload)
         .select(
-          'id, customer_name, customer_email, customer_phone, status, total, payment_method, payment_status, delivery_type, delivery_address, preferred_datetime, notes, created_at, updated_at',
+          'id, customer_name, customer_email, customer_phone, status, total, payment_method, payment_status, fulfillment_status, delivery_type, delivery_address, preferred_datetime, notes, internal_notes, created_at, updated_at',
         )
         .single();
 
@@ -240,17 +265,57 @@ export const api = {
         throw new Error('Invalid status update');
       }
 
-      const { data: updatedOrder, error: updateError } = await supabase
+      const paymentStatus = updates.payment_status;
+      if (paymentStatus && !['pending', 'paid', 'arranged'].includes(paymentStatus)) {
+        throw new Error('Invalid payment status update');
+      }
+
+      const fulfillmentStatus = updates.fulfillment_status;
+      if (fulfillmentStatus && !['not_started', 'in_progress', 'ready', 'fulfilled'].includes(fulfillmentStatus)) {
+        throw new Error('Invalid fulfillment status update');
+      }
+
+      const updatePayload = {
+        ...(status ? { status } : {}),
+        ...(paymentStatus ? { payment_status: paymentStatus } : {}),
+        ...(fulfillmentStatus ? { fulfillment_status: fulfillmentStatus } : {}),
+        ...(Object.prototype.hasOwnProperty.call(updates, 'internal_notes')
+          ? { internal_notes: updates.internal_notes ?? null }
+          : {}),
+        updated_at: new Date().toISOString(),
+      };
+
+      const richResponse = await supabase
         .from('orders')
-        .update({
-          ...(status ? { status } : {}),
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', id)
         .select(
-          'id, customer_name, customer_email, customer_phone, status, total, payment_method, payment_status, delivery_type, delivery_address, preferred_datetime, notes, created_at, updated_at',
+          'id, customer_name, customer_email, customer_phone, status, total, payment_method, payment_status, fulfillment_status, delivery_type, delivery_address, preferred_datetime, notes, internal_notes, created_at, updated_at',
         )
         .single();
+
+      let updatedOrder = richResponse.data;
+      let updateError = richResponse.error;
+
+      if (updateError && /fulfillment_status|internal_notes/i.test(updateError.message ?? '')) {
+        const legacyPayload = {
+          ...(status ? { status } : {}),
+          ...(paymentStatus ? { payment_status: paymentStatus } : {}),
+          updated_at: new Date().toISOString(),
+        };
+
+        const legacyResponse = await supabase
+          .from('orders')
+          .update(legacyPayload)
+          .eq('id', id)
+          .select(
+            'id, customer_name, customer_email, customer_phone, status, total, payment_method, payment_status, delivery_type, delivery_address, preferred_datetime, notes, created_at, updated_at',
+          )
+          .single();
+
+        updatedOrder = legacyResponse.data;
+        updateError = legacyResponse.error;
+      }
 
       if (updateError || !updatedOrder) {
         throw new Error(updateError?.message || 'Failed to update order');

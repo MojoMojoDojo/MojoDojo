@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../../lib/api';
+import { canManageSensitiveBusinessData } from '../../lib/accessControl';
 import { motion } from 'motion/react';
 import { 
   ShoppingCart, 
@@ -33,6 +34,7 @@ import {
 export function AdminDashboard() {
   const { user, accessToken } = useAuth();
   const { t } = useLanguage();
+  const canManageSensitive = canManageSensitiveBusinessData(user?.role);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [quickAddCounts, setQuickAddCounts] = useState<Record<string, number>>({});
@@ -101,6 +103,10 @@ export function AdminDashboard() {
     }
   ];
 
+  const visibleStatCards = canManageSensitive
+    ? statCards
+    : statCards.filter((card) => card.title !== 'Accepted Revenue');
+
   function incrementSku(skuId: string, amount: number) {
     setQuickAddCounts((current) => {
       const next = Math.max(0, (current[skuId] ?? 0) + amount);
@@ -159,7 +165,7 @@ export function AdminDashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map((stat, index) => {
+        {visibleStatCards.map((stat, index) => {
           const Icon = stat.icon;
           return (
             <motion.div
@@ -181,131 +187,140 @@ export function AdminDashboard() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-        <div className="premium-card p-6 xl:col-span-2">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-semibold golden-line pl-4">Quick Add Production</h2>
-            <Button variant="outline" className="btn-outline-gold" onClick={resetWorksheet}>
-              Reset
-            </Button>
-          </div>
+      {canManageSensitive ? (
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+          <div className="premium-card p-6 xl:col-span-2">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-semibold golden-line pl-4">Quick Add Production</h2>
+              <Button variant="outline" className="btn-outline-gold" onClick={resetWorksheet}>
+                Reset
+              </Button>
+            </div>
 
-          <div className="space-y-3">
-            {QUICK_ADD_SKUS.map((sku) => (
-              <div
-                key={sku.id}
-                className="p-4 bg-brand-charcoal rounded-lg border border-brand-dark-gray"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="font-semibold">{sku.label}</p>
-                    <p className="text-xs text-brand-light-gray">Revenue/unit: ${sku.revenuePerUnit.toFixed(2)}</p>
+            <div className="space-y-3">
+              {QUICK_ADD_SKUS.map((sku) => (
+                <div
+                  key={sku.id}
+                  className="p-4 bg-brand-charcoal rounded-lg border border-brand-dark-gray"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="font-semibold">{sku.label}</p>
+                      <p className="text-xs text-brand-light-gray">Revenue/unit: ${sku.revenuePerUnit.toFixed(2)}</p>
+                    </div>
+                    <p className="text-lg font-bold gold-accent">{quickAddCounts[sku.id] ?? 0}</p>
                   </div>
-                  <p className="text-lg font-bold gold-accent">{quickAddCounts[sku.id] ?? 0}</p>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="btn-outline-gold"
-                    onClick={() => incrementSku(sku.id, -1)}
-                    aria-label={`decrease ${sku.label}`}
-                  >
-                    <CircleMinus className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="btn-primary-gold"
-                    onClick={() => incrementSku(sku.id, 1)}
-                    aria-label={`increase ${sku.label}`}
-                  >
-                    <CirclePlus className="w-4 h-4" />
-                  </Button>
-
-                  <div className="ml-auto flex items-center gap-2 min-w-0">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={quickAddDrafts[sku.id] ?? ''}
-                      onChange={(event) => updateQuickAddDraft(sku.id, event.target.value)}
-                      placeholder={t.adminDashboard.quickAdd.addNumberPlaceholder}
-                      className="h-9 w-28 rounded-md border border-brand-dark-gray bg-black/30 px-2 text-sm text-white placeholder:text-brand-light-gray/70 focus:border-brand-gold focus:outline-none"
-                      aria-label={`${sku.label} ${t.adminDashboard.quickAdd.addNumberPlaceholder}`}
-                    />
+                  <div className="flex items-center gap-2">
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
                       className="btn-outline-gold"
-                      onClick={() => applyQuickAddDraft(sku.id)}
-                      disabled={!quickAddDrafts[sku.id] || Number(quickAddDrafts[sku.id]) <= 0}
-                      aria-label={t.adminDashboard.quickAdd.applyQuantity}
+                      onClick={() => incrementSku(sku.id, -1)}
+                      aria-label={`decrease ${sku.label}`}
                     >
-                      <Check className="w-4 h-4" />
+                      <CircleMinus className="w-4 h-4" />
                     </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="btn-primary-gold"
+                      onClick={() => incrementSku(sku.id, 1)}
+                      aria-label={`increase ${sku.label}`}
+                    >
+                      <CirclePlus className="w-4 h-4" />
+                    </Button>
+
+                    <div className="ml-auto flex items-center gap-2 min-w-0">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={quickAddDrafts[sku.id] ?? ''}
+                        onChange={(event) => updateQuickAddDraft(sku.id, event.target.value)}
+                        placeholder={t.adminDashboard.quickAdd.addNumberPlaceholder}
+                        className="h-9 w-28 rounded-md border border-brand-dark-gray bg-black/30 px-2 text-sm text-white placeholder:text-brand-light-gray/70 focus:border-brand-gold focus:outline-none"
+                        aria-label={`${sku.label} ${t.adminDashboard.quickAdd.addNumberPlaceholder}`}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="btn-outline-gold"
+                        onClick={() => applyQuickAddDraft(sku.id)}
+                        disabled={!quickAddDrafts[sku.id] || Number(quickAddDrafts[sku.id]) <= 0}
+                        aria-label={t.adminDashboard.quickAdd.applyQuantity}
+                      >
+                        <Check className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="premium-card p-6 xl:col-span-3">
-          <div className="mb-6">
-            <h2 className="text-2xl font-semibold golden-line pl-4">Ingredient Worksheet</h2>
-            <p className="text-sm text-brand-light-gray mt-2">
-              Live estimate from quick-add quantities. Replace with real recipe/cost tables when backend is connected.
-            </p>
+              ))}
+            </div>
           </div>
 
-          {worksheet.rows.length === 0 ? (
-            <div className="text-center py-12 text-brand-light-gray">
-              <p>Add products with quick-add to generate ingredient requirements.</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="border-brand-dark-gray hover:bg-transparent">
-                  <TableHead>Ingredient</TableHead>
-                  <TableHead className="text-right">Qty Required</TableHead>
-                  <TableHead className="text-right">Unit Cost</TableHead>
-                  <TableHead className="text-right">Extended Cost</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {worksheet.rows.map((row) => (
-                  <TableRow key={row.ingredientId} className="border-brand-dark-gray hover:bg-brand-charcoal">
-                    <TableCell>{row.ingredientName}</TableCell>
-                    <TableCell className="text-right">{row.quantityRequiredDisplay}</TableCell>
-                    <TableCell className="text-right">${row.unitCost.toFixed(4)}</TableCell>
-                    <TableCell className="text-right">${row.extendedCost.toFixed(2)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-lg bg-brand-charcoal border border-brand-dark-gray">
-              <p className="text-sm text-brand-light-gray mb-1">Total Ingredient Cost</p>
-              <p className="text-2xl font-bold">${worksheet.totals.totalIngredientCost.toFixed(2)}</p>
-            </div>
-            <div className="p-4 rounded-lg bg-brand-charcoal border border-brand-dark-gray">
-              <p className="text-sm text-brand-light-gray mb-1">Total Revenue</p>
-              <p className="text-2xl font-bold gold-accent">${worksheet.totals.totalRevenue.toFixed(2)}</p>
-            </div>
-            <div className="p-4 rounded-lg bg-brand-charcoal border border-brand-dark-gray">
-              <p className="text-sm text-brand-light-gray mb-1">Estimated Gross Profit</p>
-              <p className="text-2xl font-bold ${worksheet.totals.estimatedGrossProfit >= 0 ? 'text-green-400' : 'text-red-400'}">
-                ${worksheet.totals.estimatedGrossProfit.toFixed(2)}
+          <div className="premium-card p-6 xl:col-span-3">
+            <div className="mb-6">
+              <h2 className="text-2xl font-semibold golden-line pl-4">Ingredient Worksheet</h2>
+              <p className="text-sm text-brand-light-gray mt-2">
+                Live estimate from quick-add quantities. Replace with real recipe/cost tables when backend is connected.
               </p>
             </div>
+
+            {worksheet.rows.length === 0 ? (
+              <div className="text-center py-12 text-brand-light-gray">
+                <p>Add products with quick-add to generate ingredient requirements.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-brand-dark-gray hover:bg-transparent">
+                    <TableHead>Ingredient</TableHead>
+                    <TableHead className="text-right">Qty Required</TableHead>
+                    <TableHead className="text-right">Unit Cost</TableHead>
+                    <TableHead className="text-right">Extended Cost</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {worksheet.rows.map((row) => (
+                    <TableRow key={row.ingredientId} className="border-brand-dark-gray hover:bg-brand-charcoal">
+                      <TableCell>{row.ingredientName}</TableCell>
+                      <TableCell className="text-right">{row.quantityRequiredDisplay}</TableCell>
+                      <TableCell className="text-right">${row.unitCost.toFixed(4)}</TableCell>
+                      <TableCell className="text-right">${row.extendedCost.toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-lg bg-brand-charcoal border border-brand-dark-gray">
+                <p className="text-sm text-brand-light-gray mb-1">Total Ingredient Cost</p>
+                <p className="text-2xl font-bold">${worksheet.totals.totalIngredientCost.toFixed(2)}</p>
+              </div>
+              <div className="p-4 rounded-lg bg-brand-charcoal border border-brand-dark-gray">
+                <p className="text-sm text-brand-light-gray mb-1">Total Revenue</p>
+                <p className="text-2xl font-bold gold-accent">${worksheet.totals.totalRevenue.toFixed(2)}</p>
+              </div>
+              <div className="p-4 rounded-lg bg-brand-charcoal border border-brand-dark-gray">
+                <p className="text-sm text-brand-light-gray mb-1">Estimated Gross Profit</p>
+                <p className="text-2xl font-bold ${worksheet.totals.estimatedGrossProfit >= 0 ? 'text-green-400' : 'text-red-400'}">
+                  ${worksheet.totals.estimatedGrossProfit.toFixed(2)}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="premium-card p-6">
+          <h2 className="text-2xl font-semibold golden-line pl-4">Operations Access</h2>
+          <p className="mt-3 text-sm text-brand-light-gray">
+            Worker view hides product costing and revenue planning controls. Use Orders and Worker View for day-to-day processing.
+          </p>
+        </div>
+      )}
 
       {/* Recent Orders */}
       <div className="premium-card p-6">
@@ -338,6 +353,9 @@ export function AdminDashboard() {
                   <p className="font-semibold">{order.customer_name}</p>
                   <p className="text-sm text-brand-light-gray">
                     {order.delivery_type} • {formatPreferredDateTime(order.preferred_datetime)}
+                  </p>
+                  <p className="text-xs text-brand-light-gray mt-1">
+                    Payment: {order.payment_status ?? 'arranged'} • Fulfillment: {order.fulfillment_status ?? 'not_started'}
                   </p>
                   <p className="text-xs text-brand-light-gray mt-1">{new Date(order.created_at).toLocaleString()}</p>
                 </div>

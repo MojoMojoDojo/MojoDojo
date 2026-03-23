@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase, type UserRole } from '../../../lib/supabase';
+import { requiredRolesForAdminPath } from '../../lib/accessControl';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -18,21 +19,6 @@ export function AdminLoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const isDev = import.meta.env.DEV;
-
-  function requiredRolesForTarget(pathname: string | null): UserRole[] {
-    if (!pathname) return ['admin', 'worker'];
-    if (
-      pathname.includes('/admin/dashboard/orders') ||
-      pathname.includes('/admin/dashboard/products') ||
-      pathname.includes('/admin/dashboard/inventory') ||
-      pathname.includes('/admin/dashboard/financial') ||
-      pathname.includes('/admin/dashboard/users')
-    ) {
-      return ['admin'];
-    }
-
-    return ['admin', 'worker'];
-  }
 
   async function runDevAuthDebugCheck(targetPathname: string | null): Promise<string> {
     if (!isDev) return '';
@@ -54,7 +40,7 @@ export function AdminLoginPage() {
     }
 
     const role = profileRow.role as UserRole;
-    const allowed = requiredRolesForTarget(targetPathname);
+    const allowed = requiredRolesForAdminPath(targetPathname);
     if (!allowed.includes(role)) {
       return 'Dev debug: role not allowed.';
     }
