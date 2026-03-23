@@ -11,10 +11,13 @@ export function WorkerView() {
 
   useEffect(() => {
     loadOrders();
-  }, []);
+  }, [accessToken]);
 
   async function loadOrders() {
-    if (!accessToken) return;
+    if (!accessToken) {
+      setLoading(false);
+      return;
+    }
 
     try {
       const { orders: data } = await api.orders.getAll(accessToken);

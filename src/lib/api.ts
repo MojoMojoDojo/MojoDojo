@@ -113,13 +113,6 @@ export const api = {
 
   // Auth
   auth: {
-    async signup(email: string, password: string, name: string, role: string) {
-      return apiCall('/auth/signup', {
-        method: 'POST',
-        body: { email, password, name, role }
-      });
-    },
-
     async getUser(token: string) {
       return apiCall('/auth/user', { token });
     }

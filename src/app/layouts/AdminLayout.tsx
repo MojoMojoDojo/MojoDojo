@@ -7,10 +7,11 @@ import { ChevronDown, LogOut, UserCircle2 } from 'lucide-react';
 import logoImage from '../../assets/MojoDojoLogo.png';
 
 export function AdminLayout() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, authIssue } = useAuth();
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const isDev = import.meta.env.DEV;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -39,8 +40,12 @@ export function AdminLayout() {
   }
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
+    try {
+      await signOut();
+      setTimeout(() => navigate('/admin', { replace: true }), 100);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (
@@ -67,7 +72,7 @@ export function AdminLayout() {
               className="text-brand-light-gray hover:text-brand-gold gap-2"
             >
               <UserCircle2 className="w-4 h-4" />
-              <span className="hidden sm:inline">{user.name ?? user.email}</span>
+                <span className="hidden sm:inline">{user.name?.trim() || user.email}</span>
               <ChevronDown className={`w-4 h-4 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`} />
             </Button>
 
@@ -91,6 +96,9 @@ export function AdminLayout() {
         </header>
 
         <main className="flex-1 p-6 overflow-auto">
+          {isDev && authIssue ? (
+            <p className="mb-4 text-xs text-yellow-400">{authIssue}</p>
+          ) : null}
           <Outlet />
         </main>
       </div>

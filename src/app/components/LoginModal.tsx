@@ -27,8 +27,10 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
     try {
       const signedInUser = await signIn(email, password);
       onClose();
-      if (signedInUser.role === 'admin' || signedInUser.role === 'owner') {
+      if (signedInUser.role === 'admin') {
         navigate('/admin/dashboard');
+      } else {
+        navigate('/admin/dashboard/worker');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to sign in');
@@ -176,10 +178,10 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 Continue with Google
               </button>
 
-              {/* Demo Credentials Note */}
+              {/* Account note */}
               <div className="mt-6 p-3 bg-zinc-800/50 border border-zinc-700 rounded-lg">
                 <p className="text-xs text-gray-400 text-center">
-                  Demo Admin: <span className="text-[#D4AF37]">admin@mojodojo.com</span> / <span className="text-[#D4AF37]">admin123</span>
+                  Use your MojoDojo admin account credentials.
                 </p>
               </div>
             </motion.div>

@@ -33,7 +33,7 @@ export function OrdersManagement() {
 
   useEffect(() => {
     loadOrders();
-  }, []);
+  }, [accessToken]);
 
   async function loadOrders() {
     if (!accessToken) return;

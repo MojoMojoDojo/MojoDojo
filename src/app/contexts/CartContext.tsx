@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { Product } from '../../lib/supabase';
 import { resolveCustomization, type ProductCustomizationInput, isDefaultCustomizationKey } from '@/app/lib/productCustomization';
+import { getProductBasePriceFromCatalog } from '@/app/lib/operationsCatalog';
 
 export interface CartItem {
   id: string;
@@ -51,7 +52,8 @@ function normalizeCart(stored: unknown): CartItem[] {
 
       const customizationKey = item.customizationKey ?? fallbackResolved.key;
       const id = item.id ?? customizationKey;
-      const unitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : item.product.price + fallbackResolved.extraPrice;
+      const basePrice = getProductBasePriceFromCatalog(item.product.id, item.product.price);
+      const unitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : basePrice + fallbackResolved.extraPrice;
 
       return {
         id,
@@ -93,7 +95,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   function addToCart(product: Product, customization?: ProductCustomizationInput) {
     const resolved = resolveCustomization(product, customization);
     const itemId = resolved.key;
-    const unitPrice = product.price + resolved.extraPrice;
+    const basePrice = getProductBasePriceFromCatalog(product.id, product.price);
+    const unitPrice = basePrice + resolved.extraPrice;
 
     setCart(prev => {
       const existing = prev.find(item => item.id === itemId);

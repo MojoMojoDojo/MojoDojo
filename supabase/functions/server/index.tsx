@@ -266,7 +266,7 @@ app.post("/make-server-44229999/products", async (c) => {
     }
 
     const userData = await kv.get(`user:${user.id}`);
-    if (userData?.role !== 'owner' && userData?.role !== 'admin') {
+    if (userData?.role !== 'admin') {
       return c.json({ error: 'Insufficient permissions' }, 403);
     }
 
@@ -349,7 +349,7 @@ app.put("/make-server-44229999/orders/:id", async (c) => {
     }
 
     const userData = await kv.get(`user:${user.id}`);
-    if (!userData || (userData.role !== 'owner' && userData.role !== 'admin')) {
+    if (!userData || userData.role !== 'admin') {
       return c.json({ error: 'Insufficient permissions' }, 403);
     }
 
@@ -407,7 +407,7 @@ app.put("/make-server-44229999/ingredients/:id", async (c) => {
     }
 
     const userData = await kv.get(`user:${user.id}`);
-    if (!userData || (userData.role !== 'owner' && userData.role !== 'admin')) {
+    if (!userData || userData.role !== 'admin') {
       return c.json({ error: 'Insufficient permissions' }, 403);
     }
 

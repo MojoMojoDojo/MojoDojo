@@ -1,4 +1,5 @@
 import type { Product } from '../../lib/supabase';
+import { getProductBasePriceFromCatalog, OPERATIONS_CATALOG } from './operationsCatalog';
 import { getTiramisuSizeExtraPrice } from './pricing';
 
 export interface PreparationOption {
@@ -60,16 +61,16 @@ const COMMON_PREPARATION_OPTIONS: PreparationOption[] = [
   },
 ];
 
-const TIRAMISU_PREMIUM_ADDONS: PremiumAddOn[] = [
-  {
+const TIRAMISU_PREMIUM_ADDONS: PremiumAddOn[] = OPERATIONS_CATALOG.addOns
+  .filter((addOn) => addOn.active && addOn.productId === 'prod_3' && addOn.code === 'MARSALA_30ML')
+  .map((addOn) => ({
     id: 'marsala_30ml',
     labelKey: 'marsalaInfusion',
     descriptionKey: 'marsalaInfusionDesc',
-    abvPercent: 18,
-    addedMl: 30,
-    extraPrice: 5,
-  },
-];
+    abvPercent: Number(addOn.metadata?.abvPercent ?? 18),
+    addedMl: Number(addOn.metadata?.addedMl ?? 30),
+    extraPrice: addOn.extraPrice,
+  }));
 
 function isTiramisu(product: Product): boolean {
   const lowerName = product.name.toLowerCase();
@@ -92,16 +93,18 @@ export function getPremiumAddOns(product: Product): PremiumAddOn[] {
 export function getTiramisuSizeOptions(product: Product): TiramisuSizeOption[] {
   if (!isTiramisu(product)) return [];
 
+  const basePrice = getProductBasePriceFromCatalog(product.id, product.price);
+
   return [
     {
       id: 'small',
       labelKey: 'smallTiramisu',
-      extraPrice: getTiramisuSizeExtraPrice('small', product.price),
+      extraPrice: getTiramisuSizeExtraPrice('small', basePrice),
     },
     {
       id: 'large',
       labelKey: 'largeTiramisu',
-      extraPrice: getTiramisuSizeExtraPrice('large', product.price),
+      extraPrice: getTiramisuSizeExtraPrice('large', basePrice),
     },
   ];
 }

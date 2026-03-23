@@ -1,16 +1,9 @@
-import { CORE_VARIANTS } from './operationsDataModel';
+import { getVariantUnitPriceFromCatalog, TIRAMISU_VARIANT_IDS } from './operationsCatalog';
 
-export const TIRAMISU_VARIANT_IDS = {
-  small: 'variant_tiramisu_small',
-  large: 'variant_tiramisu_large',
-  small_alcohol: 'variant_tiramisu_small_alcohol',
-  large_alcohol: 'variant_tiramisu_large_alcohol',
-} as const;
-
-const VARIANT_PRICE_BY_ID = new Map(CORE_VARIANTS.map((variant) => [variant.id, variant.price]));
+export { TIRAMISU_VARIANT_IDS };
 
 export function getVariantUnitPrice(variantId: string, fallback = 0): number {
-  return VARIANT_PRICE_BY_ID.get(variantId) ?? fallback;
+  return getVariantUnitPriceFromCatalog(variantId, fallback);
 }
 
 export function getTiramisuAbsolutePrice(sizeId: 'small' | 'large', fallbackLargePrice: number): number {

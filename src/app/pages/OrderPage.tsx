@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router';
 import { ProductDetailModal } from '../components/ProductDetailModal';
 import { useCart } from '../contexts/CartContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { getProductBasePriceFromCatalog } from '../lib/operationsCatalog';
 import { getAllergenTags, getLocalizedProductDescription, getLocalizedProductName } from '../lib/productContent';
 import { getProductImage } from '../lib/productImages';
 
@@ -92,6 +93,7 @@ export function OrderPage() {
               const hasAllergens = getAllergenTags(product).length > 0;
               const localizedName = getLocalizedProductName(product, language);
               const localizedDescription = getLocalizedProductDescription(product, language);
+              const basePrice = getProductBasePriceFromCatalog(product.id, product.price);
 
               return (
                 <motion.div
@@ -153,7 +155,7 @@ export function OrderPage() {
 
                     <div className="flex items-center justify-between">
                       <span className="text-2xl font-bold text-brand-gold">
-                        ${product.price.toFixed(2)}
+                        ${basePrice.toFixed(2)}
                       </span>
 
                       <button

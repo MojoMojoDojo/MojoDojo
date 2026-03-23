@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase, type UserRole } from '../../../lib/supabase';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -12,20 +13,113 @@ export function AdminLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const [devDebugMessage, setDevDebugMessage] = useState<string>('');
+  const { signIn, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isDev = import.meta.env.DEV;
+
+  function requiredRolesForTarget(pathname: string | null): UserRole[] {
+    if (!pathname) return ['admin', 'worker'];
+    if (
+      pathname.includes('/admin/dashboard/orders') ||
+      pathname.includes('/admin/dashboard/products') ||
+      pathname.includes('/admin/dashboard/inventory') ||
+      pathname.includes('/admin/dashboard/financial') ||
+      pathname.includes('/admin/dashboard/users')
+    ) {
+      return ['admin'];
+    }
+
+    return ['admin', 'worker'];
+  }
+
+  async function runDevAuthDebugCheck(targetPathname: string | null): Promise<string> {
+    if (!isDev) return '';
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const session = sessionData.session;
+    if (!session?.user) {
+      return 'Dev debug: no Supabase session.';
+    }
+
+    const { data: profileRow } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .maybeSingle();
+
+    if (!profileRow) {
+      return 'Dev debug: no profile row.';
+    }
+
+    const role = profileRow.role as UserRole;
+    const allowed = requiredRolesForTarget(targetPathname);
+    if (!allowed.includes(role)) {
+      return 'Dev debug: role not allowed.';
+    }
+
+    return '';
+  }
+
+  const redirectTarget = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const raw = params.get('redirect');
+    if (!raw) return null;
+
+    try {
+      const decoded = decodeURIComponent(raw);
+      if (!decoded.startsWith('/admin')) return null;
+      return decoded;
+    } catch {
+      return null;
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+
+    if (redirectTarget) {
+      navigate(redirectTarget, { replace: true });
+      return;
+    }
+
+    if (user.role === 'admin') {
+      navigate('/admin/dashboard', { replace: true });
+      return;
+    }
+
+    navigate('/admin/dashboard/worker', { replace: true });
+  }, [authLoading, user, navigate, redirectTarget]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setDevDebugMessage('');
 
     try {
-      await signIn(email, password);
+      const signedInUser = await signIn(email, password);
       toast.success('Welcome back!');
-      navigate('/admin/dashboard');
+
+      if (redirectTarget) {
+        navigate(redirectTarget);
+        return;
+      }
+
+      if (signedInUser.role === 'admin') {
+        navigate('/admin/dashboard');
+        return;
+      }
+
+      navigate('/admin/dashboard/worker');
     } catch (error: any) {
       console.error('Login error:', error);
       toast.error(error.message || 'Invalid credentials');
+
+      const debugMessage = await runDevAuthDebugCheck(redirectTarget);
+      if (debugMessage) {
+        setDevDebugMessage(debugMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -91,12 +185,16 @@ export function AdminLoginPage() {
             </Button>
           </form>
 
+          {isDev && devDebugMessage ? (
+            <p className="mt-3 text-xs text-yellow-400">{devDebugMessage}</p>
+          ) : null}
+
           <div className="mt-6 p-4 bg-brand-charcoal rounded-lg border border-brand-dark-gray">
             <p className="text-xs text-brand-light-gray mb-2">
-              <strong className="text-brand-gold">Demo Access:</strong>
+              <strong className="text-brand-gold">Admin Auth:</strong>
             </p>
             <p className="text-xs text-brand-light-gray">
-              To create an admin account, use the signup endpoint via the API or contact the system administrator.
+              Accounts and roles are managed through Supabase Auth plus profiles role mapping.
             </p>
           </div>
         </div>

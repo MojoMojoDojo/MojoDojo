@@ -8,6 +8,7 @@ import {
   getTiramisuSizeOptions,
   resolveCustomization,
 } from '@/app/lib/productCustomization';
+import { getProductBasePriceFromCatalog } from '@/app/lib/operationsCatalog';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
   getAllergenTags,
@@ -61,8 +62,9 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
   const tiramisuSizeOptions = getTiramisuSizeOptions(currentProduct);
   const resolved = resolveCustomization(currentProduct, { preparationOptionId, premiumAddOnId, sizeOptionId });
   const productImage = getProductImage(currentProduct, { sizeOptionId: resolved.sizeOptionId });
+  const baseProductPrice = getProductBasePriceFromCatalog(currentProduct.id, currentProduct.price);
 
-  const unitPrice = currentProduct.price + resolved.extraPrice;
+  const unitPrice = baseProductPrice + resolved.extraPrice;
   const totalPrice = unitPrice * quantity;
 
   const localizedName = getLocalizedProductName(currentProduct, language);
@@ -158,7 +160,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                             {tiramisuSizeOptions.map((sizeOption) => {
                               const isSelected = resolved.sizeOptionId === sizeOption.id;
                               const sizeLabel = sizeOption.id === 'small' ? t.order.sizes.smallTiramisu : t.order.sizes.largeTiramisu;
-                              const absolutePrice = currentProduct.price + sizeOption.extraPrice;
+                              const absolutePrice = baseProductPrice + sizeOption.extraPrice;
 
                               return (
                                 <button

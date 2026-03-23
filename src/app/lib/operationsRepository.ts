@@ -28,9 +28,16 @@ export class InMemoryOperationsRepository implements OperationsRepository {
     this.data = {
       products: [...seedData.products],
       variants: [...seedData.variants],
+      addOns: [...seedData.addOns],
       ingredients: [...seedData.ingredients],
       recipes: [...seedData.recipes],
       recipeIngredients: [...seedData.recipeIngredients],
+      unitCosts: [...seedData.unitCosts],
+      packagingCosts: [...seedData.packagingCosts],
+      supplierNotes: [...seedData.supplierNotes],
+      estimatedCostAssumptions: [...seedData.estimatedCostAssumptions],
+      manualVerificationNotes: [...seedData.manualVerificationNotes],
+      defaultVariantByProductId: { ...seedData.defaultVariantByProductId },
     };
     this.orders = [...seedOrders];
   }
@@ -47,9 +54,16 @@ export class InMemoryOperationsRepository implements OperationsRepository {
     return {
       products: [...this.data.products],
       variants: [...this.data.variants],
+      addOns: [...this.data.addOns],
       ingredients: [...this.data.ingredients],
       recipes: [...this.data.recipes],
       recipeIngredients: [...this.data.recipeIngredients],
+      unitCosts: [...this.data.unitCosts],
+      packagingCosts: [...this.data.packagingCosts],
+      supplierNotes: [...this.data.supplierNotes],
+      estimatedCostAssumptions: [...this.data.estimatedCostAssumptions],
+      manualVerificationNotes: [...this.data.manualVerificationNotes],
+      defaultVariantByProductId: { ...this.data.defaultVariantByProductId },
     };
   }
 

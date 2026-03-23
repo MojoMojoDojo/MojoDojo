@@ -10,24 +10,23 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import logoImage from '../../assets/MojoDojoLogo.png';
+import type { UserRole } from '../../lib/supabase';
 
 export function AdminSidebar() {
   const location = useLocation();
   const { user, hasRole } = useAuth();
 
   const navItems = [
-    { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['owner', 'admin', 'worker'] },
-    { path: '/admin/dashboard/orders', label: 'Orders', icon: ShoppingCart, roles: ['owner', 'admin'] },
-    { path: '/admin/dashboard/products', label: 'Products', icon: Package, roles: ['owner', 'admin'] },
-    { path: '/admin/dashboard/inventory', label: 'Inventory', icon: Warehouse, roles: ['owner', 'admin'] },
-    { path: '/admin/dashboard/financial', label: 'Financial', icon: DollarSign, roles: ['owner'] },
-    { path: '/admin/dashboard/worker', label: 'Worker View', icon: ClipboardList, roles: ['owner', 'admin', 'worker'] },
-    { path: '/admin/dashboard/users', label: 'User Management', icon: Users, roles: ['owner'] },
+    { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'worker'] },
+    { path: '/admin/dashboard/orders', label: 'Orders', icon: ShoppingCart, roles: ['admin'] },
+    { path: '/admin/dashboard/products', label: 'Products', icon: Package, roles: ['admin'] },
+    { path: '/admin/dashboard/inventory', label: 'Inventory', icon: Warehouse, roles: ['admin'] },
+    { path: '/admin/dashboard/financial', label: 'Financial', icon: DollarSign, roles: ['admin'] },
+    { path: '/admin/dashboard/worker', label: 'Worker View', icon: ClipboardList, roles: ['admin', 'worker'] },
+    { path: '/admin/dashboard/users', label: 'User Management', icon: Users, roles: ['admin'] },
   ];
 
-  const visibleNavItems = navItems.filter(item => 
-    hasRole(item.roles as any)
-  );
+  const visibleNavItems = navItems.filter((item) => hasRole(item.roles as UserRole[]));
 
   return (
     <aside className="w-64 bg-brand-charcoal border-r border-brand-dark-gray flex-shrink-0">
@@ -68,7 +67,7 @@ export function AdminSidebar() {
               {user?.name?.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-brand-off-white truncate">{user?.name}</p>
+              <p className="text-sm font-medium text-brand-off-white truncate">{user?.name?.trim() || user?.email}</p>
               <p className="text-xs text-brand-light-gray capitalize">{user?.role}</p>
             </div>
           </div>

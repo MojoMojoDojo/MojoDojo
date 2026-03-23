@@ -1,6 +1,11 @@
 import { createBrowserRouter } from "react-router";
 import { RootLayout } from "./layouts/RootLayout";
 import { AdminLayout } from "./layouts/AdminLayout";
+import {
+  RedirectAuthenticatedAdminEntry,
+  RequireAuth,
+  RequireAdmin,
+} from './components/admin/AdminRouteGuards';
 
 // Public Pages
 import { HomePage } from "./pages/HomePage";
@@ -42,19 +47,30 @@ export const router = createBrowserRouter([
   },
   {
     path: "/admin",
+    Component: RedirectAuthenticatedAdminEntry,
     children: [
       { index: true, Component: AdminLoginPage },
       {
-        path: "dashboard",
-        Component: AdminLayout,
+        Component: RequireAuth,
         children: [
-          { index: true, Component: AdminDashboard },
-          { path: "orders", Component: OrdersManagement },
-          { path: "products", Component: ProductsManagement },
-          { path: "inventory", Component: InventoryManagement },
-          { path: "financial", Component: FinancialOverview },
-          { path: "worker", Component: WorkerView },
-          { path: "users", Component: UserManagement },
+          {
+            path: "dashboard",
+            Component: AdminLayout,
+            children: [
+              { index: true, Component: AdminDashboard },
+              { path: "worker", Component: WorkerView },
+              {
+                Component: RequireAdmin,
+                children: [
+                  { path: "orders", Component: OrdersManagement },
+                  { path: "products", Component: ProductsManagement },
+                  { path: "inventory", Component: InventoryManagement },
+                  { path: "financial", Component: FinancialOverview },
+                  { path: "users", Component: UserManagement },
+                ],
+              },
+            ],
+          },
         ],
       },
     ],

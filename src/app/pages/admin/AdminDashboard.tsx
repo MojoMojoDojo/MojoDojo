@@ -40,10 +40,13 @@ export function AdminDashboard() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [accessToken]);
 
   async function loadData() {
-    if (!accessToken) return;
+    if (!accessToken) {
+      setLoading(false);
+      return;
+    }
 
     try {
       const { orders: ordersData } = await api.orders.getAll(accessToken);

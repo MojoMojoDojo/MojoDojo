@@ -14,6 +14,10 @@ function ScrollToTop() {
 
 export function RootLayout() {
   useEffect(() => {
+    if (import.meta.env.VITE_ENABLE_DEMO_INIT !== 'true') {
+      return;
+    }
+
     // Initialize database on app startup
     const initDatabase = async () => {
       try {

@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import { ShoppingBag, Info } from 'lucide-react';
 import { api } from '../../lib/api';
 import type { Product } from '../../lib/supabase';
+import { getProductBasePriceFromCatalog } from '../lib/operationsCatalog';
 import { Button } from '../components/ui/button';
 import { ImageWithFallback } from '../components/shared/ImageWithFallback';
 import biscoffCheesecakeImage from '../../assets/BiscoffCheescake.png';
@@ -108,7 +109,9 @@ export function ProductsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {filteredProducts.map((product, index) => (
+              {filteredProducts.map((product, index) => {
+                const basePrice = getProductBasePriceFromCatalog(product.id, product.price);
+                return (
                 <motion.div
                   key={product.id}
                   initial={{ opacity: 0, y: 30 }}
@@ -151,7 +154,7 @@ export function ProductsPage() {
                     </div>
 
                     <div className="flex items-center justify-between mb-4">
-                      <span className="text-3xl font-bold gold-accent">${product.price}</span>
+                      <span className="text-3xl font-bold gold-accent">${basePrice}</span>
                       
                       <Dialog>
                         <DialogTrigger asChild>
@@ -185,7 +188,7 @@ export function ProductsPage() {
                               </p>
                             </div>
                             <div className="pt-4">
-                              <div className="text-3xl font-bold gold-accent mb-4">${product.price}</div>
+                              <div className="text-3xl font-bold gold-accent mb-4">${basePrice}</div>
                               <Link to="/order">
                                 <Button className="w-full btn-primary-gold">
                                   Add to Order
@@ -212,7 +215,8 @@ export function ProductsPage() {
                     </Link>
                   </div>
                 </motion.div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

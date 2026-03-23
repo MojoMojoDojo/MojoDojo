@@ -2,6 +2,10 @@ import type { Product } from '../../lib/supabase';
 import { calculateOperationsSummary } from './operationsCalculator';
 import { CORE_OPERATIONS_DATA } from './operationsDataModel';
 import {
+  getProductBasePriceFromCatalog,
+  getVariantById,
+} from './operationsCatalog';
+import {
   getTiramisuSizeExtraPrice,
   getVariantUnitPrice,
   TIRAMISU_VARIANT_IDS,
@@ -53,8 +57,8 @@ export interface OperationalSku {
 export const OPERATIONAL_INGREDIENTS: OperationalIngredient[] = CORE_OPERATIONS_DATA.ingredients.map((ingredient) => ({
   id: ingredient.id,
   name: ingredient.name.en,
-  unit: ingredient.unit,
-  unitCost: ingredient.unitCost,
+  unit: ingredient.defaultUnit,
+  unitCost: CORE_OPERATIONS_DATA.unitCosts.find((row) => row.ingredientId === ingredient.id && row.active)?.costPerUnit ?? 0,
 }));
 
 function recipeForVariant(variantId: string): Record<string, number> {
@@ -72,42 +76,42 @@ export const QUICK_ADD_SKUS: OperationalSku[] = [
   {
     id: 'biscoff_cheesecake',
     variantId: 'variant_biscoff_standard',
-    label: 'Biscoff Cheesecake',
+    label: getVariantById('variant_biscoff_standard')?.name.en ?? 'Biscoff Cheesecake',
     revenuePerUnit: getVariantUnitPrice('variant_biscoff_standard', 15),
     recipe: recipeForVariant('variant_biscoff_standard'),
   },
   {
     id: 'cheesecake_brownie_tray',
     variantId: 'variant_brownie_tray_standard',
-    label: 'Cheesecake Brownie Tray',
+    label: getVariantById('variant_brownie_tray_standard')?.name.en ?? 'Cheesecake Brownie Tray',
     revenuePerUnit: getVariantUnitPrice('variant_brownie_tray_standard', 25),
     recipe: recipeForVariant('variant_brownie_tray_standard'),
   },
   {
     id: 'tiramisu_small',
     variantId: 'variant_tiramisu_small',
-    label: 'Tiramisu Small',
+    label: getVariantById('variant_tiramisu_small')?.name.en ?? 'Tiramisu Small',
     revenuePerUnit: getVariantUnitPrice(TIRAMISU_VARIANT_IDS.small, 10),
     recipe: recipeForVariant('variant_tiramisu_small'),
   },
   {
     id: 'tiramisu_large',
     variantId: 'variant_tiramisu_large',
-    label: 'Tiramisu Large',
+    label: getVariantById('variant_tiramisu_large')?.name.en ?? 'Tiramisu Large',
     revenuePerUnit: getVariantUnitPrice(TIRAMISU_VARIANT_IDS.large, 25),
     recipe: recipeForVariant('variant_tiramisu_large'),
   },
   {
     id: 'tiramisu_small_alcohol',
     variantId: 'variant_tiramisu_small_alcohol',
-    label: 'Tiramisu Small + Marsala',
+    label: getVariantById('variant_tiramisu_small_alcohol')?.name.en ?? 'Tiramisu Small + Marsala',
     revenuePerUnit: getVariantUnitPrice(TIRAMISU_VARIANT_IDS.small_alcohol, 15),
     recipe: recipeForVariant('variant_tiramisu_small_alcohol'),
   },
   {
     id: 'tiramisu_large_alcohol',
     variantId: 'variant_tiramisu_large_alcohol',
-    label: 'Tiramisu Large + Marsala',
+    label: getVariantById('variant_tiramisu_large_alcohol')?.name.en ?? 'Tiramisu Large + Marsala',
     revenuePerUnit: getVariantUnitPrice(TIRAMISU_VARIANT_IDS.large_alcohol, 30),
     recipe: recipeForVariant('variant_tiramisu_large_alcohol'),
   },
@@ -190,10 +194,11 @@ function inferRecipeProfile(product: Product): string {
 
 export function createInitialProductSetups(products: Product[]): AdminProductSetup[] {
   return products.map((product) => {
+    const basePrice = getProductBasePriceFromCatalog(product.id, product.price);
     const variants: ProductVariantSetup[] = isTiramisuProduct(product)
       ? [
-          { id: 'small', label: 'Small', priceModifier: getTiramisuSizeExtraPrice('small', product.price) },
-          { id: 'large', label: 'Large', priceModifier: getTiramisuSizeExtraPrice('large', product.price) },
+          { id: 'small', label: 'Small', priceModifier: getTiramisuSizeExtraPrice('small', basePrice) },
+          { id: 'large', label: 'Large', priceModifier: getTiramisuSizeExtraPrice('large', basePrice) },
         ]
       : [];
 
@@ -203,7 +208,7 @@ export function createInitialProductSetups(products: Product[]): AdminProductSet
       nameFr: product.name_fr ?? '',
       descriptionEn: product.description,
       descriptionFr: product.description_fr ?? '',
-      price: product.price,
+      price: basePrice,
       available: product.visible && product.status !== 'sold_out',
       recipeProfile: inferRecipeProfile(product),
       variants,

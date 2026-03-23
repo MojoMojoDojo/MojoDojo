@@ -1,24 +1,25 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase, supabaseAnonKey } from '../../lib/supabase';
-const DEMO_EMAIL = 'admin@mojodojo.com';
-const DEMO_PASSWORD = 'admin123';
-const DEMO_STORAGE_KEY = 'mojodojo.demo.user';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { Session, User as SupabaseAuthUser } from '@supabase/supabase-js';
+import { supabase, type UserRole } from '../../lib/supabase';
 
 interface User {
   id: string;
   email: string;
   name?: string;
-  role?: 'admin' | 'owner' | 'worker' | 'user';
+  role: UserRole;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   accessToken: string | null;
+  isAuthenticated: boolean;
+  authIssue: string | null;
+  mfaReady: boolean;
   signIn: (email: string, password: string) => Promise<User>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
-  hasRole: (roles: Array<User['role']>) => boolean;
+  hasRole: (roles: UserRole[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,68 +28,119 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [authIssue, setAuthIssue] = useState<string | null>(null);
+  const isDev = import.meta.env.DEV;
 
-  function getStoredDemoUser(): User | null {
-    try {
-      const stored = localStorage.getItem(DEMO_STORAGE_KEY);
-      if (!stored) {
-        return null;
-      }
-      return JSON.parse(stored) as User;
-    } catch {
-      return null;
+  function devLog(label: string, payload?: unknown) {
+    if (!isDev) return;
+    console.log(`[auth] ${label}`, payload ?? '');
+  }
+
+  function normalizeRole(rawRole: string | null | undefined): UserRole {
+    if (rawRole === 'admin' || rawRole === 'worker') {
+      return rawRole;
     }
+    return 'worker';
+  }
+
+  async function fetchRoleFromProfile(authUser: SupabaseAuthUser): Promise<UserRole> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', authUser.id)
+      .maybeSingle();
+
+    devLog('current user id', authUser.id);
+    devLog('fetched profile row', data ?? null);
+    if (error) {
+      devLog('profile fetch ERROR', error.message);
+    }
+
+    if (!error && data?.role) {
+      const resolvedRole = normalizeRole(data.role);
+      devLog('resolved role', resolvedRole);
+
+      if (data.role !== 'admin' && data.role !== 'worker') {
+        setAuthIssue(`Invalid profile role "${String(data.role)}". Falling back to "${resolvedRole}".`);
+      } else {
+        setAuthIssue(null);
+      }
+
+      return resolvedRole;
+    }
+
+    if (!data?.role) {
+      const msg = `Profile exists but role is ${data === null ? 'null' : 'missing'}. Falling back to user metadata.`;
+      devLog('profile role issue', msg);
+      setAuthIssue(msg);
+    }
+
+    const fallbackRole = normalizeRole((authUser.user_metadata?.role as string | undefined) ?? undefined);
+    devLog('fallback role from metadata', { metadata: authUser.user_metadata?.role, resolved: fallbackRole });
+    return fallbackRole;
+  }
+
+  async function mapUser(authUser: SupabaseAuthUser): Promise<User> {
+    const role = await fetchRoleFromProfile(authUser);
+    return {
+      id: authUser.id,
+      email: authUser.email || '',
+      name: authUser.user_metadata?.name,
+      role,
+    };
+  }
+
+  async function applySession(session: Session | null) {
+    devLog('session state', {
+      hasSession: !!session,
+      hasUser: !!session?.user,
+    });
+
+    if (!session?.user) {
+      setUser(null);
+      setAccessToken(null);
+      setAuthIssue(null);
+      return;
+    }
+
+    const mapped = await mapUser(session.user);
+    setUser(mapped);
+    setAccessToken(session.access_token);
   }
 
   useEffect(() => {
-    // Check for existing session
-    checkSession();
+    const bootstrap = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        await applySession(session);
+      } catch (error) {
+        console.error('Session check error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    bootstrap();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      try {
+        await applySession(session);
+      } catch (error) {
+        console.error('Auth state change handling error:', error);
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
-
-  async function checkSession() {
-    try {
-      const demoUser = getStoredDemoUser();
-      if (demoUser) {
-        setUser(demoUser);
-        setAccessToken(supabaseAnonKey);
-        return;
-      }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser({
-          id: session.user.id,
-          email: session.user.email || '',
-          name: session.user.user_metadata?.name,
-          role: session.user.user_metadata?.role || 'user',
-        });
-        setAccessToken(session.access_token);
-      }
-    } catch (error) {
-      console.error('Session check error:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function signIn(email: string, password: string): Promise<User> {
     try {
       const normalizedEmail = email.trim().toLowerCase();
       const normalizedPassword = password.trim();
-
-      if (normalizedEmail === DEMO_EMAIL && normalizedPassword === DEMO_PASSWORD) {
-        const demoUser: User = {
-          id: 'demo-admin',
-          email: DEMO_EMAIL,
-          name: 'Demo Admin',
-          role: 'admin',
-        };
-
-        localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(demoUser));
-        setUser(demoUser);
-        setAccessToken(supabaseAnonKey);
-        return demoUser;
-      }
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
@@ -98,12 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
 
       if (data.session?.user) {
-        const signedInUser: User = {
-          id: data.session.user.id,
-          email: data.session.user.email || '',
-          name: data.session.user.user_metadata?.name,
-          role: data.session.user.user_metadata?.role || 'user',
-        };
+        const signedInUser = await mapUser(data.session.user);
         setUser(signedInUser);
         setAccessToken(data.session.access_token);
         return signedInUser;
@@ -130,7 +177,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signOut() {
     try {
       await supabase.auth.signOut();
-      localStorage.removeItem(DEMO_STORAGE_KEY);
       setUser(null);
       setAccessToken(null);
     } catch (error: any) {
@@ -138,15 +184,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  function hasRole(roles: Array<User['role']>) {
-    if (!user?.role) {
-      return false;
-    }
+  function hasRole(roles: UserRole[]) {
+    if (!user) return false;
     return roles.includes(user.role);
   }
 
+  const value = useMemo(
+    () => ({
+      user,
+      loading,
+      accessToken,
+      isAuthenticated: !!user,
+      authIssue,
+      // Placeholder to keep auth flow MFA-friendly for future rollout.
+      mfaReady: true,
+      signIn,
+      signInWithGoogle,
+      signOut,
+      hasRole,
+    }),
+    [user, loading, accessToken, authIssue],
+  );
+
   return (
-    <AuthContext.Provider value={{ user, loading, accessToken, signIn, signInWithGoogle, signOut, hasRole }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

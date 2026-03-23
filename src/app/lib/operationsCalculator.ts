@@ -3,9 +3,11 @@ import {
   type CostSummaryModel,
   type IngredientModel,
   type OperationsDataStore,
+  type PackagingCostModel,
   type ProductVariantModel,
   type RecipeIngredientModel,
   type RecipeModel,
+  type UnitCostModel,
 } from './operationsDataModel';
 
 export interface VariantQuantityInput {
@@ -20,6 +22,22 @@ export interface IngredientUsageRow {
   quantityRequired: number;
   unitCost: number;
   extendedCost: number;
+}
+
+function activeUnitCostMap(unitCosts: UnitCostModel[]) {
+  return new Map(
+    unitCosts
+      .filter((unitCost) => unitCost.active)
+      .map((unitCost) => [unitCost.ingredientId, unitCost]),
+  );
+}
+
+function activePackagingCostMap(packagingCosts: PackagingCostModel[]) {
+  return new Map(
+    packagingCosts
+      .filter((packagingCost) => packagingCost.active)
+      .map((packagingCost) => [packagingCost.variantId, packagingCost]),
+  );
 }
 
 export interface OperationsCalculationResult {
@@ -73,11 +91,14 @@ export function calculateOperationsSummary(
 ): OperationsCalculationResult {
   const variants = activeVariantMap(data.variants);
   const ingredients = activeIngredientMap(data.ingredients);
+  const unitCosts = activeUnitCostMap(data.unitCosts);
+  const packagingCosts = activePackagingCostMap(data.packagingCosts);
   const recipeByVariant = recipeByVariantMap(data.recipes);
   const ingredientsByRecipe = ingredientsByRecipeMap(data.recipeIngredients);
 
   const ingredientUsage = new Map<string, number>();
   let totalRevenue = 0;
+  let totalPackagingCost = 0;
 
   for (const line of input) {
     if (line.quantity <= 0) continue;
@@ -86,6 +107,7 @@ export function calculateOperationsSummary(
     if (!variant) continue;
 
     totalRevenue += variant.price * line.quantity;
+    totalPackagingCost += (packagingCosts.get(variant.id)?.costPerUnit ?? 0) * line.quantity;
 
     const recipe = recipeByVariant.get(variant.id);
     if (!recipe) continue;
@@ -107,27 +129,32 @@ export function calculateOperationsSummary(
     const ingredient = ingredients.get(ingredientId);
     if (!ingredient) continue;
 
-    const extendedCost = quantityRequired * ingredient.unitCost;
+    const unitCost = unitCosts.get(ingredientId)?.costPerUnit ?? 0;
+    const extendedCost = quantityRequired * unitCost;
     totalIngredientCost += extendedCost;
 
     rows.push({
       ingredientId: ingredient.id,
       ingredientName: ingredient.name.en,
-      unit: ingredient.unit,
+      unit: ingredient.defaultUnit,
       quantityRequired,
-      unitCost: ingredient.unitCost,
+      unitCost,
       extendedCost,
     });
   }
 
   rows.sort((a, b) => a.ingredientName.localeCompare(b.ingredientName));
 
+  const totalEstimatedCost = totalIngredientCost + totalPackagingCost;
+
   return {
     rows,
     totals: {
       totalIngredientCost,
+      totalPackagingCost,
+      totalEstimatedCost,
       totalRevenue,
-      estimatedGrossProfit: totalRevenue - totalIngredientCost,
+      estimatedGrossProfit: totalRevenue - totalEstimatedCost,
     },
   };
 }

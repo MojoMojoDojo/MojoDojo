@@ -12,7 +12,7 @@ export function FinancialOverview() {
 
   useEffect(() => {
     loadOrders();
-  }, []);
+  }, [accessToken]);
 
   async function loadOrders() {
     if (!accessToken) return;

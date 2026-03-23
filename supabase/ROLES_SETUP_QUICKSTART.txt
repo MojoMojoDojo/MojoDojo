@@ -1,0 +1,34 @@
+MojoDojo Roles Setup (Quick)
+
+1. In Supabase SQL Editor, run:
+- supabase/sql/001_profiles_roles_rls.sql
+
+2. Create/update profile rows for your auth users:
+- role must be one of: admin, worker
+- id must match auth.users.id
+
+3. Example upsert:
+insert into public.profiles (id, email, full_name, role, mfa_required)
+values ('<auth_user_uuid>', 'admin@mojodojo.com', 'Admin User', 'admin', false)
+on conflict (id) do update
+set role = excluded.role,
+    email = excluded.email,
+    full_name = excluded.full_name,
+    mfa_required = excluded.mfa_required;
+
+4. In app, sign in at /admin with Supabase email/password.
+
+5. Expected access:
+- admin: full admin access (dashboard, orders, products, inventory, financial, user management)
+- worker: restricted access (dashboard + worker view only, cannot perform destructive actions)
+
+6. Dev-only login debug on /admin:
+- no Supabase session
+- no profile row
+- role not allowed
+
+Notes:
+- No service_role key is used in browser code.
+- Optional demo init endpoint only runs if VITE_ENABLE_DEMO_INIT=true.
+- Admin can access and manage everything.
+- Worker can sign in and view, but cannot delete, change products/pricing, edit inventory costs, or change roles.
