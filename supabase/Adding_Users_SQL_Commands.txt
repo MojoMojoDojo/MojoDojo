@@ -1,0 +1,36 @@
+ADMIN:
+
+insert into public.profiles (id, email, full_name, role, mfa_required)
+values (
+  'PASTE_THE_USER_ID_HERE',
+  'YOUR_EMAIL_HERE',
+  'Admin User',
+  'admin',
+  false
+)
+on conflict (id) do update
+set
+  email = excluded.email,
+  full_name = excluded.full_name,
+  role = excluded.role,
+  mfa_required = excluded.mfa_required;
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------
+
+WORKER:
+
+insert into public.profiles (id, email, full_name, role, mfa_required)
+values (
+  'PASTE_WORKER_USER_ID_HERE',
+  'WORKER_EMAIL_HERE',
+  'Worker User',
+  'worker',
+  false
+)
+on conflict (id) do update
+set
+  email = excluded.email,
+  full_name = excluded.full_name,
+  role = excluded.role,
+  mfa_required = excluded.mfa_required;

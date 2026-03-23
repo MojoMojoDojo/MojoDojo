@@ -24,6 +24,25 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const AUTH_INIT_TIMEOUT_MS = 8000;
+const PROFILE_FETCH_TIMEOUT_MS = 6000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }) as Promise<T>;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,16 +63,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function fetchRoleFromProfile(authUser: SupabaseAuthUser): Promise<UserRole> {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', authUser.id)
-      .maybeSingle();
+    let data: { role?: string | null } | null = null;
+    let error: { message?: string } | null = null;
+
+    try {
+      const response = await withTimeout(
+        supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', authUser.id)
+          .maybeSingle(),
+        PROFILE_FETCH_TIMEOUT_MS,
+        'Profile role lookup',
+      );
+      data = response.data;
+      error = response.error;
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : 'Unknown profile lookup error';
+      devLog('profile fetch ERROR', message);
+      setAuthIssue(`Could not verify profile role (${message}). Falling back to user metadata.`);
+    }
 
     devLog('current user id', authUser.id);
     devLog('fetched profile row', data ?? null);
     if (error) {
-      devLog('profile fetch ERROR', error.message);
+      devLog('profile fetch ERROR', error.message ?? 'Unknown profile query error');
     }
 
     if (!error && data?.role) {
@@ -109,30 +143,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    let isMounted = true;
+
     const bootstrap = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        await applySession(session);
+        const { data: { session } } = await withTimeout(
+          supabase.auth.getSession(),
+          AUTH_INIT_TIMEOUT_MS,
+          'Initial auth session',
+        );
+        await withTimeout(applySession(session), AUTH_INIT_TIMEOUT_MS, 'Initial session mapping');
       } catch (error) {
         console.error('Session check error:', error);
+        if (isMounted) {
+          setUser(null);
+          setAccessToken(null);
+          setAuthIssue('Could not restore your session. Please sign in again.');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    bootstrap();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      try {
-        await applySession(session);
-      } catch (error) {
-        console.error('Auth state change handling error:', error);
-      } finally {
-        setLoading(false);
-      }
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      void (async () => {
+        try {
+          await withTimeout(applySession(session), AUTH_INIT_TIMEOUT_MS, 'Auth state mapping');
+        } catch (error) {
+          console.error('Auth state change handling error:', error);
+        } finally {
+          if (isMounted) {
+            setLoading(false);
+          }
+        }
+      })();
     });
 
+    void bootstrap();
+
     return () => {
+      isMounted = false;
       authListener.subscription.unsubscribe();
     };
   }, []);
