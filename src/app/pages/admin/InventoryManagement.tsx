@@ -6,11 +6,16 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { toast } from 'sonner';
 import { AlertTriangle, Package2 } from 'lucide-react';
+import { canManageSensitiveBusinessData } from '../../lib/accessControl';
 
 export function InventoryManagement() {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stockDrafts, setStockDrafts] = useState<Record<string, string>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const canManage = canManageSensitiveBusinessData(user?.role);
 
   useEffect(() => {
     loadIngredients();
@@ -22,6 +27,12 @@ export function InventoryManagement() {
     try {
       const { ingredients: data } = await api.ingredients.getAll(accessToken);
       setIngredients(data);
+      setStockDrafts(
+        data.reduce<Record<string, string>>((acc, item) => {
+          acc[item.id] = String(item.stock_quantity);
+          return acc;
+        }, {}),
+      );
     } catch (error) {
       console.error('Failed to load ingredients:', error);
       toast.error('Failed to load ingredients');
@@ -32,14 +43,21 @@ export function InventoryManagement() {
 
   async function updateStock(id: string, newQuantity: number) {
     if (!accessToken) return;
+    if (!canManage) {
+      toast.error('Only admins can update stock');
+      return;
+    }
 
     try {
+      setSavingId(id);
       await api.ingredients.update(id, { stock_quantity: newQuantity }, accessToken);
       toast.success('Stock updated');
-      loadIngredients();
+      await loadIngredients();
     } catch (error) {
       console.error('Failed to update stock:', error);
       toast.error('Failed to update stock');
+    } finally {
+      setSavingId(null);
     }
   }
 
@@ -51,6 +69,9 @@ export function InventoryManagement() {
         <h1 className="text-3xl font-bold mb-2">
           Inventory <span className="gold-accent">Management</span>
         </h1>
+        {!canManage ? (
+          <p className="text-sm text-brand-light-gray">Worker access is read-only.</p>
+        ) : null}
         {lowStockItems.length > 0 && (
           <div className="flex items-center gap-2 text-yellow-500 mt-2">
             <AlertTriangle className="w-5 h-5" />
@@ -68,6 +89,9 @@ export function InventoryManagement() {
           </div>
         ) : (
           <div className="space-y-4">
+            {ingredients.length === 0 ? (
+              <div className="text-sm text-brand-light-gray">No inventory records found.</div>
+            ) : null}
             {ingredients.map((ingredient) => {
               const isLowStock = ingredient.stock_quantity <= ingredient.threshold_alert;
               
@@ -118,6 +142,38 @@ export function InventoryManagement() {
                       </p>
                     </div>
                   </div>
+
+                  {canManage ? (
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        value={stockDrafts[ingredient.id] ?? String(ingredient.stock_quantity)}
+                        onChange={(event) =>
+                          setStockDrafts((current) => ({
+                            ...current,
+                            [ingredient.id]: event.target.value,
+                          }))
+                        }
+                        className="w-40 bg-brand-black border-brand-dark-gray"
+                      />
+                      <Button
+                        type="button"
+                        className="btn-primary-gold"
+                        disabled={savingId === ingredient.id}
+                        onClick={() => {
+                          const value = Number(stockDrafts[ingredient.id]);
+                          if (!Number.isFinite(value) || value < 0) {
+                            toast.error('Enter a valid stock quantity');
+                            return;
+                          }
+                          void updateStock(ingredient.id, value);
+                        }}
+                      >
+                        Save Stock
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               );
             })}

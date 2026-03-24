@@ -75,7 +75,7 @@ export function AdminLoginPage() {
       return;
     }
 
-    navigate('/admin/dashboard/worker', { replace: true });
+    navigate('/admin/dashboard/orders', { replace: true });
   }, [authLoading, user, navigate, redirectTarget]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -97,7 +97,7 @@ export function AdminLoginPage() {
         return;
       }
 
-      navigate('/admin/dashboard/worker');
+      navigate('/admin/dashboard/orders');
     } catch (error: any) {
       console.error('Login error:', error);
       toast.error(error.message || 'Invalid credentials');

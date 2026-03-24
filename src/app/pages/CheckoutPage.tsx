@@ -90,6 +90,25 @@ function combineLocalDateAndTime(canonicalDate: string, timeValue: string): Date
   return new Date(date.getFullYear(), date.getMonth(), date.getDate(), hours, minutes, 0, 0);
 }
 
+function normalizePhone(value: string): string {
+  const trimmed = value.trim();
+  const digits = trimmed.replace(/\D/g, '');
+
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
+
+  if (trimmed.startsWith('+') && digits.length > 0) {
+    return `+${digits}`;
+  }
+
+  return digits || trimmed;
+}
+
 const PICKUP_ADDRESS = '90 rue Prince';
 
 function buildHourOptions(startHour24: number, endHour24: number) {
@@ -229,17 +248,27 @@ export function CheckoutPage() {
 
     if (!validatePreferredDatetime()) return;
 
+    const normalizedPhone = normalizePhone(customerPhone);
+    const requestedDate = canonicalPreferredDate;
+    const requestedTime = preferredTime;
+    const fulfillmentType = deliveryType === 'delivery' ? 'delivery' : 'pickup';
+
     setSubmitting(true);
     try {
       await api.orders.create({
         customer_name: customerName,
         customer_email: customerEmail,
-        customer_phone: customerPhone,
+        customer_phone: normalizedPhone,
+        fulfillment_type: fulfillmentType,
         delivery_type: deliveryType,
         delivery_address: deliveryType === 'delivery' ? deliveryAddress : undefined,
+        requested_date: requestedDate,
+        requested_time: requestedTime,
         preferred_datetime: buildPreferredDatetime(),
+        special_instructions: notes || undefined,
         payment_method: 'arranged_after_approval',
         notes: notes || undefined,
+        subtotal: total,
         total,
         status: 'request_received',
         items: cart.map(item => ({

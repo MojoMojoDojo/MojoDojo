@@ -51,14 +51,15 @@ export function RequireAuth({ allowedRoles }: RequireAuthProps) {
   }
 
   if (allowedRoles && allowedRoles.length > 0 && !hasRole(allowedRoles)) {
+    const fallbackPath = user?.role === 'worker' ? '/admin/dashboard/orders' : '/admin/dashboard';
     if (isDev) {
       console.log('[admin-route] redirect decision', {
         reason: 'role not allowed',
         from: `${location.pathname}${location.search}`,
-        to: '/admin/dashboard/worker',
+        to: fallbackPath,
       });
     }
-    return <Navigate to="/admin/dashboard/worker" replace />;
+    return <Navigate to={fallbackPath} replace />;
   }
 
   if (isDev) {
@@ -145,9 +146,9 @@ export function RedirectAuthenticatedAdminEntry() {
     console.log('[admin-route] redirect decision', {
       reason: 'authenticated worker at /admin',
       from: `${location.pathname}${location.search}`,
-      to: '/admin/dashboard/worker',
+      to: '/admin/dashboard/orders',
     });
   }
 
-  return <Navigate to="/admin/dashboard/worker" replace />;
+  return <Navigate to="/admin/dashboard/orders" replace />;
 }

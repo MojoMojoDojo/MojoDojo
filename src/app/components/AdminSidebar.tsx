@@ -5,8 +5,7 @@ import {
   Package, 
   Warehouse, 
   DollarSign, 
-  Users, 
-  ClipboardList 
+  Users
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import logoImage from '../../assets/MojoDojoLogo.png';
@@ -25,7 +24,6 @@ export function AdminSidebar() {
     { path: '/admin/dashboard/products', label: 'Products', icon: Package, section: 'products' as AdminSection },
     { path: '/admin/dashboard/inventory', label: 'Inventory', icon: Warehouse, section: 'inventory' as AdminSection },
     { path: '/admin/dashboard/financial', label: 'Financial', icon: DollarSign, section: 'financial' as AdminSection },
-    { path: '/admin/dashboard/worker', label: 'Worker View', icon: ClipboardList, section: 'worker' as AdminSection },
     { path: '/admin/dashboard/users', label: 'User Management', icon: Users, section: 'users' as AdminSection },
   ];
 

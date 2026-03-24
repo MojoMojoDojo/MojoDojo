@@ -317,7 +317,7 @@ export function AdminDashboard() {
         <div className="premium-card p-6">
           <h2 className="text-2xl font-semibold golden-line pl-4">Operations Access</h2>
           <p className="mt-3 text-sm text-brand-light-gray">
-            Worker view hides product costing and revenue planning controls. Use Orders and Worker View for day-to-day processing.
+            Worker access hides product costing and revenue planning controls. Use Orders, Products, and Inventory for day-to-day processing.
           </p>
         </div>
       )}

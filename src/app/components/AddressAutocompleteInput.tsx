@@ -15,7 +15,37 @@ export type AddressAutocompleteProvider = (
   context: AddressAutocompleteProviderContext
 ) => Promise<AddressSuggestion[]>;
 
-const defaultProvider: AddressAutocompleteProvider = async () => [];
+const MAPBOX_API = 'https://api.mapbox.com/geocoding/v5/mapbox.places';
+
+const defaultProvider: AddressAutocompleteProvider = async (query, context) => {
+  const token = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN as string | undefined;
+  if (!token || query.trim().length < 3) return [];
+
+  const language = context.language === 'fr' ? 'fr' : 'en';
+  const endpoint = `${MAPBOX_API}/${encodeURIComponent(query)}.json`
+    + `?access_token=${encodeURIComponent(token)}`
+    + `&autocomplete=true`
+    + `&types=address,place,postcode`
+    + `&limit=6`
+    + `&country=ca`
+    + `&language=${language}`;
+
+  const response = await fetch(endpoint);
+  if (!response.ok) return [];
+
+  const payload = await response.json() as {
+    features?: Array<{ id?: string; text?: string; place_name?: string }>;
+  };
+
+  const features = payload.features ?? [];
+  return features
+    .filter((feature) => feature.place_name)
+    .map((feature) => ({
+      id: feature.id ?? feature.place_name ?? Math.random().toString(36).slice(2),
+      primaryText: feature.place_name ?? feature.text ?? '',
+      secondaryText: feature.text,
+    }));
+};
 
 interface AddressAutocompleteInputProps {
   value: string;

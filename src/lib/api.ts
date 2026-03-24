@@ -9,11 +9,24 @@ interface ApiOptions {
   token?: string;
 }
 
+type OrderCreatePayload = Partial<Order> & {
+  fulfillment_type?: 'pickup' | 'delivery';
+  requested_date?: string;
+  requested_time?: string;
+  preferred_date?: string;
+  preferred_time?: string;
+  special_instructions?: string;
+  subtotal?: number;
+};
+
 type OrderRow = {
   id: string;
-  customer_name: string;
-  customer_email: string;
-  customer_phone: string;
+  customer_name?: string | null;
+  customer_email?: string | null;
+  customer_phone?: string | null;
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
   status: Order['status'];
   total: number;
   payment_method?: Order['payment_method'];
@@ -53,11 +66,11 @@ function mapOrderRowsToOrders(orderRows: OrderRow[], itemRows: OrderItemRow[]): 
   return sortOrdersNewestFirst(
     orderRows.map((row) => ({
       id: row.id,
-      customer_name: row.customer_name,
-      customer_email: row.customer_email,
-      customer_phone: row.customer_phone,
+      customer_name: row.customer_name ?? row.full_name ?? '',
+      customer_email: row.customer_email ?? row.email ?? '',
+      customer_phone: row.customer_phone ?? row.phone ?? '',
       status: row.status,
-      total: row.total,
+      total: Number(row.total ?? 0),
       payment_method: row.payment_method,
       payment_status: row.payment_status,
       fulfillment_status: row.fulfillment_status,
@@ -69,8 +82,8 @@ function mapOrderRowsToOrders(orderRows: OrderRow[], itemRows: OrderItemRow[]): 
       items: (itemsByOrder.get(row.id) ?? []).map((item) => ({
         product_id: item.product_id,
         product_name: item.product_name,
-        quantity: item.quantity,
-        price: item.price,
+        quantity: Number(item.quantity ?? 0),
+        price: Number(item.price ?? 0),
         customization: (item.customization as Order['items'][number]['customization']) ?? undefined,
       })),
       created_at: row.created_at,
@@ -149,31 +162,16 @@ export const api = {
         // Keep API compatible without forcing session changes.
       }
 
-      const richSelect =
-        'id, customer_name, customer_email, customer_phone, status, total, payment_method, payment_status, fulfillment_status, delivery_type, delivery_address, preferred_datetime, notes, internal_notes, created_at, updated_at';
-      const legacySelect =
-        'id, customer_name, customer_email, customer_phone, status, total, payment_method, payment_status, delivery_type, delivery_address, preferred_datetime, notes, created_at, updated_at';
-
       let orderRows: any[] | null = null;
       let ordersError: { message?: string } | null = null;
 
-      const richResponse = await supabase
+      const response = await supabase
         .from('orders')
-        .select(richSelect)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      orderRows = richResponse.data;
-      ordersError = richResponse.error;
-
-      if (ordersError && /fulfillment_status|internal_notes/i.test(ordersError.message ?? '')) {
-        const legacyResponse = await supabase
-          .from('orders')
-          .select(legacySelect)
-          .order('created_at', { ascending: false });
-
-        orderRows = legacyResponse.data;
-        ordersError = legacyResponse.error;
-      }
+      orderRows = response.data;
+      ordersError = response.error;
 
       if (ordersError) {
         throw new Error(ordersError.message || 'Failed to fetch orders');
@@ -197,33 +195,87 @@ export const api = {
       return { orders };
     },
 
-    async create(order: Partial<Order>) {
+    async create(order: OrderCreatePayload) {
       const now = new Date().toISOString();
-      const orderPayload = {
+      const fulfillmentType = order.fulfillment_type ?? order.delivery_type ?? 'pickup';
+      const requestedDate = order.requested_date ?? order.preferred_date ?? order.preferred_datetime?.slice(0, 10) ?? null;
+      const requestedTime = order.requested_time ?? order.preferred_time ?? order.preferred_datetime?.slice(11, 16) ?? null;
+      const specialInstructions = order.special_instructions ?? order.notes ?? null;
+      const subtotal = order.subtotal ?? order.total ?? 0;
+
+      const modernOrderPayload = {
         customer_name: order.customer_name,
         customer_email: order.customer_email,
         customer_phone: order.customer_phone,
         status: order.status ?? 'request_received',
+        subtotal,
         total: order.total ?? 0,
         payment_method: order.payment_method ?? 'arranged_after_approval',
-        payment_status: order.payment_status ?? 'arranged',
+        payment_status: order.payment_status ?? 'pending',
         fulfillment_status: order.fulfillment_status ?? 'not_started',
-        delivery_type: order.delivery_type ?? 'pickup',
+        fulfillment_type: fulfillmentType,
+        delivery_type: fulfillmentType,
         delivery_address: order.delivery_address ?? null,
+        requested_date: requestedDate,
+        preferred_date: requestedDate,
+        requested_time: requestedTime,
+        preferred_time: requestedTime,
         preferred_datetime: order.preferred_datetime ?? null,
-        notes: order.notes ?? null,
+        special_instructions: specialInstructions,
+        notes: specialInstructions,
         internal_notes: order.internal_notes ?? null,
         created_at: now,
         updated_at: now,
       };
 
-      const { data: insertedOrder, error: orderInsertError } = await supabase
+      let insertedOrder: any = null;
+      let orderInsertError: { message?: string } | null = null;
+
+      const modernInsert = await supabase
         .from('orders')
-        .insert(orderPayload)
-        .select(
-          'id, customer_name, customer_email, customer_phone, status, total, payment_method, payment_status, fulfillment_status, delivery_type, delivery_address, preferred_datetime, notes, internal_notes, created_at, updated_at',
-        )
+        .insert(modernOrderPayload)
+        .select('*')
         .single();
+
+      insertedOrder = modernInsert.data;
+      orderInsertError = modernInsert.error;
+
+      if (
+        orderInsertError &&
+        /customer_email|customer_name|customer_phone|fulfillment_status|internal_notes|fulfillment_type|requested_date|requested_time|special_instructions|subtotal/i.test(orderInsertError.message ?? '')
+      ) {
+        const legacyOrderPayload = {
+          full_name: order.customer_name,
+          email: order.customer_email,
+          phone: order.customer_phone,
+          status: order.status ?? 'request_received',
+          subtotal,
+          total: order.total ?? 0,
+          payment_method: order.payment_method ?? 'arranged_after_approval',
+          payment_status: order.payment_status ?? 'pending',
+          fulfillment_type: fulfillmentType,
+          delivery_type: fulfillmentType,
+          delivery_address: order.delivery_address ?? null,
+          requested_date: requestedDate,
+          preferred_date: requestedDate,
+          requested_time: requestedTime,
+          preferred_time: requestedTime,
+          preferred_datetime: order.preferred_datetime ?? null,
+          special_instructions: specialInstructions,
+          notes: specialInstructions,
+          created_at: now,
+          updated_at: now,
+        };
+
+        const legacyInsert = await supabase
+          .from('orders')
+          .insert(legacyOrderPayload)
+          .select('*')
+          .single();
+
+        insertedOrder = legacyInsert.data;
+        orderInsertError = legacyInsert.error;
+      }
 
       if (orderInsertError || !insertedOrder) {
         throw new Error(orderInsertError?.message || 'Failed to save order');
@@ -249,11 +301,23 @@ export const api = {
       }
 
       const createdOrder: Order = {
-        ...insertedOrder,
+        id: insertedOrder.id,
+        customer_name: insertedOrder.customer_name ?? insertedOrder.full_name ?? order.customer_name ?? '',
+        customer_email: insertedOrder.customer_email ?? insertedOrder.email ?? order.customer_email ?? '',
+        customer_phone: insertedOrder.customer_phone ?? insertedOrder.phone ?? order.customer_phone ?? '',
+        status: insertedOrder.status,
+        total: Number(insertedOrder.total ?? order.total ?? 0),
+        payment_method: insertedOrder.payment_method ?? order.payment_method,
+        payment_status: insertedOrder.payment_status ?? order.payment_status,
+        fulfillment_status: insertedOrder.fulfillment_status ?? order.fulfillment_status,
+        delivery_type: insertedOrder.delivery_type ?? (order.delivery_type as Order['delivery_type']) ?? 'pickup',
         delivery_address: insertedOrder.delivery_address ?? undefined,
         preferred_datetime: insertedOrder.preferred_datetime ?? undefined,
         notes: insertedOrder.notes ?? undefined,
+        internal_notes: insertedOrder.internal_notes ?? undefined,
         items: orderItems,
+        created_at: insertedOrder.created_at ?? now,
+        updated_at: insertedOrder.updated_at ?? now,
       } as Order;
 
       return { order: createdOrder, success: true };
@@ -289,9 +353,7 @@ export const api = {
         .from('orders')
         .update(updatePayload)
         .eq('id', id)
-        .select(
-          'id, customer_name, customer_email, customer_phone, status, total, payment_method, payment_status, fulfillment_status, delivery_type, delivery_address, preferred_datetime, notes, internal_notes, created_at, updated_at',
-        )
+        .select('*')
         .single();
 
       let updatedOrder = richResponse.data;
@@ -308,9 +370,7 @@ export const api = {
           .from('orders')
           .update(legacyPayload)
           .eq('id', id)
-          .select(
-            'id, customer_name, customer_email, customer_phone, status, total, payment_method, payment_status, delivery_type, delivery_address, preferred_datetime, notes, created_at, updated_at',
-          )
+          .select('*')
           .single();
 
         updatedOrder = legacyResponse.data;
@@ -338,10 +398,72 @@ export const api = {
   // Ingredients
   ingredients: {
     async getAll(token: string): Promise<{ ingredients: Ingredient[] }> {
+      const inventoryResponse = await supabase
+        .from('inventory_items')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (!inventoryResponse.error && inventoryResponse.data) {
+        const ingredients = (inventoryResponse.data as Array<Record<string, unknown>>).map((row) => ({
+          id: String(row.id ?? ''),
+          name: String(row.name ?? ''),
+          unit: String(row.unit ?? ''),
+          cost_per_unit: Number(row.cost_per_unit ?? 0),
+          stock_quantity: Number(row.stock_quantity ?? 0),
+          threshold_alert: Number(row.threshold_alert ?? 0),
+          supplier: row.supplier ? String(row.supplier) : undefined,
+          created_at: String(row.created_at ?? new Date().toISOString()),
+        }));
+
+        return { ingredients };
+      }
+
+      const ingredientsResponse = await supabase
+        .from('ingredients')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (!ingredientsResponse.error && ingredientsResponse.data) {
+        const ingredients = (ingredientsResponse.data as Array<Record<string, unknown>>).map((row) => ({
+          id: String(row.id ?? ''),
+          name: String(row.name ?? ''),
+          unit: String(row.unit ?? ''),
+          cost_per_unit: Number(row.cost_per_unit ?? 0),
+          stock_quantity: Number(row.stock_quantity ?? 0),
+          threshold_alert: Number(row.threshold_alert ?? 0),
+          supplier: row.supplier ? String(row.supplier) : undefined,
+          created_at: String(row.created_at ?? new Date().toISOString()),
+        }));
+
+        return { ingredients };
+      }
+
       return apiCall('/ingredients', { token });
     },
 
     async update(id: string, updates: Partial<Ingredient>, token: string) {
+      const inventoryUpdate = await supabase
+        .from('inventory_items')
+        .update(updates)
+        .eq('id', id)
+        .select('id')
+        .maybeSingle();
+
+      if (!inventoryUpdate.error) {
+        return { success: true };
+      }
+
+      const ingredientUpdate = await supabase
+        .from('ingredients')
+        .update(updates)
+        .eq('id', id)
+        .select('id')
+        .maybeSingle();
+
+      if (!ingredientUpdate.error) {
+        return { success: true };
+      }
+
       return apiCall(`/ingredients/${id}`, {
         method: 'PUT',
         body: updates,

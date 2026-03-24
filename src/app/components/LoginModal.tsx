@@ -30,7 +30,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       if (signedInUser.role === 'admin') {
         navigate('/admin/dashboard');
       } else {
-        navigate('/admin/dashboard/worker');
+        navigate('/admin/dashboard/orders');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to sign in');

@@ -6,7 +6,7 @@ import { TrendingUp, DollarSign, CreditCard } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { toMainOrderStatus } from '../../lib/adminOperations';
 
-type Timeframe = 'last_7_days' | 'month' | 'year' | 'all_time';
+type Timeframe = 'day' | 'last_7_days' | 'month' | 'year' | 'all_time';
 
 type ChartPoint = {
   key: string;
@@ -80,6 +80,13 @@ export function FinancialOverview() {
     const orderDate = new Date(order.created_at);
     if (Number.isNaN(orderDate.getTime())) continue;
 
+    if (timeframe === 'day') {
+      const dayKey = now.toISOString().slice(0, 10);
+      if (orderDate.toISOString().slice(0, 10) !== dayKey) continue;
+      addPoint(dayKey, 'Today', order);
+      continue;
+    }
+
     if (timeframe === 'last_7_days') {
       const start = getStartOfDay(new Date(now));
       start.setDate(start.getDate() - 6);
@@ -126,6 +133,10 @@ export function FinancialOverview() {
     const orderDate = new Date(order.created_at);
     if (Number.isNaN(orderDate.getTime())) return false;
 
+    if (timeframe === 'day') {
+      return orderDate.toISOString().slice(0, 10) === selectedKey;
+    }
+
     if (timeframe === 'last_7_days') {
       return orderDate.toISOString().slice(0, 10) === selectedKey;
     }
@@ -154,7 +165,9 @@ export function FinancialOverview() {
   const averageOrder = selectedOrders.length > 0 ? totalRevenue / selectedOrders.length : 0;
 
   const timeframeLabel =
-    timeframe === 'last_7_days'
+    timeframe === 'day'
+      ? 'Today'
+      : timeframe === 'last_7_days'
       ? 'Last 7 days'
       : timeframe === 'month'
         ? 'This month'
@@ -169,31 +182,6 @@ export function FinancialOverview() {
           Financial <span className="gold-accent">Overview</span>
         </h1>
         <p className="text-brand-light-gray mt-2">Owner-only access • Revenue and performance metrics</p>
-      </div>
-
-      <div className="flex flex-wrap gap-3">
-        {[
-          { key: 'last_7_days', label: 'Last 7 days' },
-          { key: 'month', label: 'Month' },
-          { key: 'year', label: 'Year' },
-          { key: 'all_time', label: 'All time' },
-        ].map((option) => (
-          <button
-            key={option.key}
-            type="button"
-            onClick={() => {
-              setTimeframe(option.key as Timeframe);
-              setSelectedPeriodKey(null);
-            }}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-              timeframe === option.key
-                ? 'bg-brand-gold text-brand-black'
-                : 'bg-brand-charcoal text-brand-light-gray hover:text-brand-gold'
-            }`}
-          >
-            {option.label}
-          </button>
-        ))}
       </div>
 
       {/* Financial Stats */}
@@ -233,8 +221,37 @@ export function FinancialOverview() {
 
       {/* Revenue Chart */}
       <div className="premium-card p-6">
-        <h2 className="text-2xl font-semibold mb-2 golden-line pl-4">Revenue by Period</h2>
-        <p className="mb-6 text-sm text-brand-light-gray">Click a bar to drill into orders for that period.</p>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-semibold mb-2 golden-line pl-4">Revenue by Period</h2>
+            <p className="text-sm text-brand-light-gray">Click a bar to drill into orders for that period.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: 'day', label: 'Day' },
+              { key: 'last_7_days', label: '7 days' },
+              { key: 'month', label: 'Month' },
+              { key: 'year', label: 'Year' },
+              { key: 'all_time', label: 'All time' },
+            ].map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => {
+                  setTimeframe(option.key as Timeframe);
+                  setSelectedPeriodKey(null);
+                }}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                  timeframe === option.key
+                    ? 'bg-brand-gold text-brand-black'
+                    : 'bg-brand-charcoal text-brand-light-gray hover:text-brand-gold'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData}>

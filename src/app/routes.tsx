@@ -27,7 +27,6 @@ import { OrdersManagement } from "./pages/admin/OrdersManagement";
 import { ProductsManagement } from "./pages/admin/ProductsManagement";
 import { InventoryManagement } from "./pages/admin/InventoryManagement";
 import { FinancialOverview } from "./pages/admin/FinancialOverview";
-import { WorkerView } from "./pages/admin/WorkerView";
 import { UserManagement } from "./pages/admin/UserManagement";
 
 export const router = createBrowserRouter([
@@ -58,17 +57,18 @@ export const router = createBrowserRouter([
             path: "dashboard",
             Component: AdminLayout,
             children: [
-              { index: true, Component: AdminDashboard },
-              { path: "worker", Component: WorkerView },
               {
                 Component: RequireStaff,
-                children: [{ path: "orders", Component: OrdersManagement }],
+                children: [
+                  { path: "orders", Component: OrdersManagement },
+                  { path: "products", Component: ProductsManagement },
+                  { path: "inventory", Component: InventoryManagement },
+                ],
               },
               {
                 Component: RequireAdmin,
                 children: [
-                  { path: "products", Component: ProductsManagement },
-                  { path: "inventory", Component: InventoryManagement },
+                  { index: true, Component: AdminDashboard },
                   { path: "financial", Component: FinancialOverview },
                   { path: "users", Component: UserManagement },
                 ],

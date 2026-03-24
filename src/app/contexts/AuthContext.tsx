@@ -124,6 +124,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }
 
+  async function logStaffLoginEvent(signedInUser: User) {
+    try {
+      const { error } = await supabase.from('admin_login_events').insert({
+        user_id: signedInUser.id,
+        email: signedInUser.email,
+        role: signedInUser.role,
+        logged_in_at: new Date().toISOString(),
+      });
+
+      if (error && isDev) {
+        console.warn('[auth] login event logging skipped:', error.message);
+      }
+    } catch (error) {
+      if (isDev) {
+        console.warn('[auth] login event logging error:', error);
+      }
+    }
+  }
+
   async function applySession(session: Session | null) {
     devLog('session state', {
       hasSession: !!session,
@@ -205,6 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const signedInUser = await mapUser(data.session.user);
         setUser(signedInUser);
         setAccessToken(data.session.access_token);
+        await logStaffLoginEvent(signedInUser);
         return signedInUser;
       }
 
