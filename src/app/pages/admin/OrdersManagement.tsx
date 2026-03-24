@@ -19,6 +19,7 @@ import {
 } from '../../lib/adminOperations';
 
 const ORDER_FILTERS: MainOrderStatus[] = ['all', 'request_received', 'under_review', 'accepted', 'rejected'];
+const DELIVERY_FILTERS: Array<'all' | 'pickup' | 'delivery'> = ['all', 'pickup', 'delivery'];
 
 const PAYMENT_STATUS_OPTIONS: NonNullable<Order['payment_status']>[] = ['pending', 'paid'];
 const PAYMENT_STATUS_LABELS: Record<NonNullable<Order['payment_status']>, string> = {
@@ -43,8 +44,12 @@ export function OrdersManagement() {
   const { accessToken, user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<MainOrderStatus>('all');
-  const [dateSortMode, setDateSortMode] = useState<'none' | 'newest' | 'oldest'>('none');
+  const [statusFilter, setStatusFilter] = useState<MainOrderStatus>('all');
+  const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'pickup' | 'delivery'>('all');
+  const [paymentFilter, setPaymentFilter] = useState<'all' | 'pending' | 'paid'>('all');
+  const [fulfillmentFilter, setFulfillmentFilter] = useState<'all' | NonNullable<Order['fulfillment_status']>>('all');
+  const [dateSortMode, setDateSortMode] = useState<'none' | 'asc' | 'desc'>('none');
+  const [totalSortMode, setTotalSortMode] = useState<'none' | 'asc' | 'desc'>('none');
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [openInfoByOrderId, setOpenInfoByOrderId] = useState<Record<string, boolean>>({});
@@ -150,22 +155,48 @@ export function OrdersManagement() {
     await updateOrder(orderId, { status: 'rejected' }, 'Order rejected');
   }
 
-  const filteredOrders = filter === 'all'
-    ? orders
-    : orders.filter((order) => toMainOrderStatus(order.status) === filter);
-
-  const displayOrders = [...filteredOrders].sort((a, b) => {
-    if (dateSortMode === 'none') return 0;
-
-    const aTime = new Date(a.preferred_datetime ?? a.created_at).getTime();
-    const bTime = new Date(b.preferred_datetime ?? b.created_at).getTime();
-
-    if (dateSortMode === 'newest') {
-      return bTime - aTime;
+  const filteredOrders = orders.filter((order) => {
+    if (statusFilter !== 'all' && toMainOrderStatus(order.status) !== statusFilter) {
+      return false;
     }
 
-    return aTime - bTime;
+    if (deliveryFilter !== 'all' && order.delivery_type !== deliveryFilter) {
+      return false;
+    }
+
+    const resolvedPayment = order.payment_status ?? 'pending';
+    if (paymentFilter !== 'all' && resolvedPayment !== paymentFilter) {
+      return false;
+    }
+
+    const resolvedFulfillment = order.fulfillment_status ?? 'not_started';
+    if (fulfillmentFilter !== 'all' && resolvedFulfillment !== fulfillmentFilter) {
+      return false;
+    }
+
+    return true;
   });
+
+  const displayOrders = [...filteredOrders].sort((a, b) => {
+    if (dateSortMode !== 'none') {
+      const aTime = new Date(a.preferred_datetime ?? a.created_at).getTime();
+      const bTime = new Date(b.preferred_datetime ?? b.created_at).getTime();
+      if (aTime !== bTime) {
+        return dateSortMode === 'asc' ? aTime - bTime : bTime - aTime;
+      }
+    }
+
+    if (totalSortMode !== 'none' && a.total !== b.total) {
+      return totalSortMode === 'asc' ? a.total - b.total : b.total - a.total;
+    }
+
+    return (a.display_id ?? Number.MAX_SAFE_INTEGER) - (b.display_id ?? Number.MAX_SAFE_INTEGER);
+  });
+
+  function cycleSort(current: 'none' | 'asc' | 'desc', requested: 'asc' | 'desc') {
+    if (current === requested) return 'none';
+    return requested;
+  }
 
   function formatPreferredDateTime(value?: string) {
     if (!value) return '—';
@@ -191,12 +222,37 @@ export function OrdersManagement() {
     }));
   }
 
-  function cycleDateSortMode() {
-    setDateSortMode((current) => {
-      if (current === 'none') return 'newest';
-      if (current === 'newest') return 'oldest';
-      return 'none';
-    });
+  function renderSortArrows(
+    label: string,
+    mode: 'none' | 'asc' | 'desc',
+    onChange: (next: 'none' | 'asc' | 'desc') => void,
+  ) {
+    const upClass = mode === 'none' || mode === 'asc' ? 'font-bold text-brand-off-white' : 'font-medium text-brand-light-gray/50';
+    const downClass = mode === 'none' || mode === 'desc' ? 'font-bold text-brand-off-white' : 'font-medium text-brand-light-gray/50';
+
+    return (
+      <div className="flex items-center justify-between rounded-lg border border-brand-dark-gray bg-brand-dark-gray px-3 py-2">
+        <span className="text-sm text-brand-light-gray">{label}</span>
+        <div className="flex flex-col leading-none">
+          <button
+            type="button"
+            onClick={() => onChange(cycleSort(mode, 'asc'))}
+            className={`h-3 text-[11px] transition-all ${upClass}`}
+            aria-label={`${label} ascending`}
+          >
+            ▲
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange(cycleSort(mode, 'desc'))}
+            className={`h-3 text-[11px] transition-all ${downClass}`}
+            aria-label={`${label} descending`}
+          >
+            ▼
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -213,47 +269,79 @@ export function OrdersManagement() {
         </div>
       ) : null}
 
-      {/* Filters */}
-      <div className="flex gap-4">
-        {ORDER_FILTERS.map((status) => (
-          <button
-            key={status}
-            onClick={() => setFilter(status)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              filter === status
-                ? 'bg-brand-gold text-brand-black'
-                : 'bg-brand-dark-gray text-brand-light-gray hover:bg-brand-gray hover:text-brand-gold'
-            }`}
+      <div className="rounded-lg border border-brand-dark-gray bg-brand-charcoal p-4">
+        <p className="text-sm font-semibold text-brand-off-white">Filters</p>
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as MainOrderStatus)}>
+            <SelectTrigger className="w-full border-brand-dark-gray bg-brand-dark-gray text-brand-off-white">
+              <SelectValue placeholder="Order status" />
+            </SelectTrigger>
+            <SelectContent className="border-brand-dark-gray bg-brand-charcoal text-brand-off-white">
+              {ORDER_FILTERS.map((status) => (
+                <SelectItem key={status} value={status}>
+                  Status: {MAIN_ORDER_STATUS_LABELS[status]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={deliveryFilter} onValueChange={(value) => setDeliveryFilter(value as 'all' | 'pickup' | 'delivery')}>
+            <SelectTrigger className="w-full border-brand-dark-gray bg-brand-dark-gray text-brand-off-white">
+              <SelectValue placeholder="Delivery type" />
+            </SelectTrigger>
+            <SelectContent className="border-brand-dark-gray bg-brand-charcoal text-brand-off-white">
+              {DELIVERY_FILTERS.map((type) => (
+                <SelectItem key={type} value={type}>
+                  Delivery: {type === 'all' ? 'All' : type === 'pickup' ? 'Pickup' : 'Delivery'}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={paymentFilter} onValueChange={(value) => setPaymentFilter(value as 'all' | 'pending' | 'paid')}>
+            <SelectTrigger className="w-full border-brand-dark-gray bg-brand-dark-gray text-brand-off-white">
+              <SelectValue placeholder="Payment status" />
+            </SelectTrigger>
+            <SelectContent className="border-brand-dark-gray bg-brand-charcoal text-brand-off-white">
+              <SelectItem value="all">Payment: All</SelectItem>
+              <SelectItem value="pending">Payment: Pending</SelectItem>
+              <SelectItem value="paid">Payment: Paid</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={fulfillmentFilter}
+            onValueChange={(value) => setFulfillmentFilter(value as 'all' | NonNullable<Order['fulfillment_status']>)}
           >
-            {MAIN_ORDER_STATUS_LABELS[status]}
-          </button>
-        ))}
+            <SelectTrigger className="w-full border-brand-dark-gray bg-brand-dark-gray text-brand-off-white">
+              <SelectValue placeholder="Fulfillment" />
+            </SelectTrigger>
+            <SelectContent className="border-brand-dark-gray bg-brand-charcoal text-brand-off-white">
+              <SelectItem value="all">Fulfillment: All</SelectItem>
+              {FULFILLMENT_STATUS_OPTIONS.map((status) => (
+                <SelectItem key={status} value={status}>
+                  Fulfillment: {FULFILLMENT_STATUS_LABELS[status]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {renderSortArrows('Order Date', dateSortMode, setDateSortMode)}
+          {renderSortArrows('Amount', totalSortMode, setTotalSortMode)}
+        </div>
       </div>
 
       {/* Orders List */}
       <div>
-        <div className="mb-3">
-          <button
-            type="button"
-            onClick={cycleDateSortMode}
-            className="inline-flex items-center gap-2 rounded-lg border border-brand-dark-gray bg-brand-dark-gray px-3 py-2 text-sm text-brand-off-white transition-all hover:border-brand-gold"
-          >
-            <span>Order Date</span>
-            <span className="tracking-tight">
-              {dateSortMode === 'none' ? '↑↓' : dateSortMode === 'newest' ? '↓' : '↑'}
-            </span>
-          </button>
-        </div>
-
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
               <div key={i} className="shimmer-effect h-24 rounded-lg"></div>
             ))}
           </div>
-        ) : filteredOrders.length === 0 ? (
+        ) : displayOrders.length === 0 ? (
           <div className="text-center py-12 text-brand-light-gray">
-            <p>No {filter !== 'all' ? MAIN_ORDER_STATUS_LABELS[filter].toLowerCase() : ''} orders found</p>
+            <p>No orders match the selected filters</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -265,7 +353,7 @@ export function OrdersManagement() {
                 <div className="mb-4 flex items-start justify-between gap-4">
                   <div className="flex items-start gap-4">
                     <div className="flex h-10 min-w-10 items-center justify-center rounded-lg border border-brand-gold/60 bg-brand-gold/10 px-2 text-sm font-bold text-brand-gold">
-                      #{index + 1}
+                      #{order.display_id ?? index + 1}
                     </div>
                     <div>
                       <h3 className="mb-1 text-lg font-semibold">{order.customer_name}</h3>
@@ -337,22 +425,29 @@ export function OrdersManagement() {
 
                 {openInfoByOrderId[order.id] ? (
                   <div className="mb-4 rounded-lg border border-brand-dark-gray bg-brand-black/40 p-4">
-                    <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
-                      <p><span className="text-brand-light-gray">Order ID:</span> {order.id}</p>
-                      <p><span className="text-brand-light-gray">Email:</span> {order.customer_email}</p>
-                      <p><span className="text-brand-light-gray">Phone:</span> {order.customer_phone}</p>
-                      <p>
-                        <span className="text-brand-light-gray">Payment Method:</span>{' '}
-                        <span className="capitalize">{order.payment_method ?? 'arranged_after_approval'}</span>
-                      </p>
-                      <p className="md:col-span-2">
-                        <span className="text-brand-light-gray">Internal Note:</span>{' '}
-                        <span>{(order.internal_notes ?? '').trim() || 'None yet'}</span>
-                      </p>
-                      <p className="md:col-span-2">
-                        <span className="text-brand-light-gray">Request Sent Time:</span> {formatRequestSent(order.created_at)}
-                      </p>
+                    <div className="grid grid-cols-1 gap-6 text-sm md:grid-cols-2">
+                      <div className="space-y-2">
+                        <p><span className="text-brand-light-gray">Order ID:</span> {order.id}</p>
+                        <p><span className="text-brand-light-gray">Phone:</span> {order.customer_phone}</p>
+                        <p><span className="text-brand-light-gray">Request Sent Time:</span> {formatRequestSent(order.created_at)}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <p><span className="text-brand-light-gray">Email:</span> {order.customer_email}</p>
+                        <p>
+                          <span className="text-brand-light-gray">Payment Method:</span>{' '}
+                          <span className="capitalize">{order.payment_method ?? 'arranged_after_approval'}</span>
+                        </p>
+                        <p>
+                          <span className="text-brand-light-gray">Fulfillment:</span>{' '}
+                          {FULFILLMENT_STATUS_LABELS[order.fulfillment_status ?? 'not_started']}
+                        </p>
+                      </div>
                     </div>
+
+                    <p className="mt-3 text-sm">
+                      <span className="text-brand-light-gray">Current Internal Note:</span>{' '}
+                      <span>{(order.internal_notes ?? '').trim() || 'None yet'}</span>
+                    </p>
 
                     <div className="mt-4">
                       <h4 className="mb-2 font-semibold">Internal Notes</h4>

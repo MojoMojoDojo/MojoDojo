@@ -22,6 +22,7 @@ type OrderCreatePayload = Partial<Order> & {
 
 type OrderRow = {
   id: string;
+  display_id?: number | null;
   customer_name?: string | null;
   customer_email?: string | null;
   customer_phone?: string | null;
@@ -167,6 +168,7 @@ function mapOrderRowsToOrders(orderRows: OrderRow[], itemRows: OrderItemRow[]): 
   return sortOrdersNewestFirst(
     orderRows.map((row) => ({
       id: row.id,
+      display_id: row.display_id ?? undefined,
       customer_name: row.customer_name ?? row.full_name ?? '',
       customer_email: row.customer_email ?? row.email ?? '',
       customer_phone: row.customer_phone ?? row.phone ?? '',
@@ -250,6 +252,41 @@ export const api = {
     }
   },
 
+  users: {
+    async getAll(token: string): Promise<{
+      users: Array<{ id: string; email: string; full_name?: string; role: 'admin' | 'worker'; created_at?: string }>;
+    }> {
+      const db = getSupabaseForToken(token);
+
+      const { data, error } = await db
+        .from('profiles')
+        .select('id, email, full_name, role, created_at')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw new Error(error.message || 'Failed to fetch users. Check profiles select policy for admin users.');
+      }
+
+      const users = (data ?? []).map((row) => ({
+        id: String(row.id ?? ''),
+        email: String(row.email ?? ''),
+        full_name: row.full_name ? String(row.full_name) : undefined,
+        role: (row.role === 'admin' ? 'admin' : 'worker') as 'admin' | 'worker',
+        created_at: row.created_at ? String(row.created_at) : undefined,
+      }));
+
+      return { users };
+    },
+
+    async create(payload: { email: string; password: string; name?: string; role: 'admin' | 'worker' }, token: string) {
+      return apiCall('/auth/signup', {
+        method: 'POST',
+        body: payload,
+        token,
+      });
+    },
+  },
+
   // Products
   products: {
     async getAll(): Promise<{ products: Product[] }> {
@@ -309,6 +346,7 @@ export const api = {
 
     async create(order: OrderCreatePayload) {
       const now = new Date().toISOString();
+      const generatedOrderId = crypto.randomUUID();
       const fulfillmentType = order.fulfillment_type ?? order.delivery_type ?? 'pickup';
       const requestedDate = order.requested_date ?? order.preferred_date ?? order.preferred_datetime?.slice(0, 10) ?? null;
       const requestedTime = order.requested_time ?? order.preferred_time ?? order.preferred_datetime?.slice(11, 16) ?? null;
@@ -316,6 +354,7 @@ export const api = {
       const subtotal = order.subtotal ?? order.total ?? 0;
 
       const modernOrderPayload = {
+        id: generatedOrderId,
         customer_name: order.customer_name,
         customer_email: order.customer_email,
         customer_phone: order.customer_phone,
@@ -340,16 +379,14 @@ export const api = {
         updated_at: now,
       };
 
-      let insertedOrder: any = null;
+      let insertedOrder: Record<string, unknown> | null = null;
       let orderInsertError: { message?: string } | null = null;
 
       const modernInsert = await supabase
         .from('orders')
-        .insert(modernOrderPayload)
-        .select('*')
-        .single();
+        .insert(modernOrderPayload);
 
-      insertedOrder = modernInsert.data;
+      insertedOrder = modernOrderPayload as Record<string, unknown>;
       orderInsertError = modernInsert.error;
 
       if (
@@ -357,6 +394,7 @@ export const api = {
         /customer_email|customer_name|customer_phone|fulfillment_status|internal_notes|fulfillment_type|requested_date|requested_time|special_instructions|subtotal/i.test(orderInsertError.message ?? '')
       ) {
         const legacyOrderPayload = {
+          id: generatedOrderId,
           full_name: order.customer_name,
           email: order.customer_email,
           phone: order.customer_phone,
@@ -381,11 +419,9 @@ export const api = {
 
         const legacyInsert = await supabase
           .from('orders')
-          .insert(legacyOrderPayload)
-          .select('*')
-          .single();
+          .insert(legacyOrderPayload);
 
-        insertedOrder = legacyInsert.data;
+        insertedOrder = legacyOrderPayload as Record<string, unknown>;
         orderInsertError = legacyInsert.error;
       }
 
@@ -404,23 +440,23 @@ export const api = {
       }
 
       const createdOrder: Order = {
-        id: insertedOrder.id,
-        customer_name: insertedOrder.customer_name ?? insertedOrder.full_name ?? order.customer_name ?? '',
-        customer_email: insertedOrder.customer_email ?? insertedOrder.email ?? order.customer_email ?? '',
-        customer_phone: insertedOrder.customer_phone ?? insertedOrder.phone ?? order.customer_phone ?? '',
-        status: insertedOrder.status,
+        id: String(insertedOrder.id ?? generatedOrderId),
+        customer_name: String(insertedOrder.customer_name ?? insertedOrder.full_name ?? order.customer_name ?? ''),
+        customer_email: String(insertedOrder.customer_email ?? insertedOrder.email ?? order.customer_email ?? ''),
+        customer_phone: String(insertedOrder.customer_phone ?? insertedOrder.phone ?? order.customer_phone ?? ''),
+        status: (insertedOrder.status as Order['status']) ?? 'request_received',
         total: Number(insertedOrder.total ?? order.total ?? 0),
-        payment_method: insertedOrder.payment_method ?? order.payment_method,
-        payment_status: insertedOrder.payment_status ?? order.payment_status,
-        fulfillment_status: insertedOrder.fulfillment_status ?? order.fulfillment_status,
-        delivery_type: insertedOrder.delivery_type ?? (order.delivery_type as Order['delivery_type']) ?? 'pickup',
-        delivery_address: insertedOrder.delivery_address ?? undefined,
-        preferred_datetime: insertedOrder.preferred_datetime ?? undefined,
-        notes: insertedOrder.notes ?? undefined,
-        internal_notes: insertedOrder.internal_notes ?? undefined,
+        payment_method: (insertedOrder.payment_method as Order['payment_method']) ?? order.payment_method,
+        payment_status: (insertedOrder.payment_status as Order['payment_status']) ?? order.payment_status,
+        fulfillment_status: (insertedOrder.fulfillment_status as Order['fulfillment_status']) ?? order.fulfillment_status,
+        delivery_type: (insertedOrder.delivery_type as Order['delivery_type']) ?? (order.delivery_type as Order['delivery_type']) ?? 'pickup',
+        delivery_address: (insertedOrder.delivery_address as string | null | undefined) ?? undefined,
+        preferred_datetime: (insertedOrder.preferred_datetime as string | null | undefined) ?? undefined,
+        notes: (insertedOrder.notes as string | null | undefined) ?? undefined,
+        internal_notes: (insertedOrder.internal_notes as string | null | undefined) ?? undefined,
         items: orderItems,
-        created_at: insertedOrder.created_at ?? now,
-        updated_at: insertedOrder.updated_at ?? now,
+        created_at: String(insertedOrder.created_at ?? now),
+        updated_at: String(insertedOrder.updated_at ?? now),
       } as Order;
 
       return { order: createdOrder, success: true };
@@ -481,6 +517,9 @@ export const api = {
       }
 
       if (updateError) {
+        if ((updateError.message ?? '').includes('orders_payment_status_check')) {
+          throw new Error('Database payment status constraint is outdated. Run supabase/sql/005_orders_display_id_and_payment_status_fix.sql and retry.');
+        }
         throw new Error(updateError?.message || 'Failed to update order');
       }
 

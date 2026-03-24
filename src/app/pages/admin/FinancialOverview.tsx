@@ -1,10 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../../lib/api';
 import type { Order } from '../../../lib/supabase';
-import { TrendingUp, DollarSign, CreditCard } from 'lucide-react';
+import { TrendingUp, DollarSign, CreditCard, CircleMinus, CirclePlus, Check } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { toMainOrderStatus } from '../../lib/adminOperations';
+import { buildIngredientWorksheet, QUICK_ADD_SKUS } from '../../lib/adminOperations';
+import { Button } from '../../components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../../components/ui/table';
 
 type Timeframe = 'day' | 'last_7_days' | 'month' | 'year' | 'all_time';
 
@@ -37,6 +47,8 @@ export function FinancialOverview() {
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState<Timeframe>('last_7_days');
   const [selectedPeriodKey, setSelectedPeriodKey] = useState<string | null>(null);
+  const [quickAddCounts, setQuickAddCounts] = useState<Record<string, number>>({});
+  const [quickAddDrafts, setQuickAddDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadOrders();
@@ -55,7 +67,15 @@ export function FinancialOverview() {
     }
   }
 
-  const acceptedOrders = orders.filter((order) => toMainOrderStatus(order.status) === 'accepted');
+  const acceptedPaidOrders = orders.filter(
+    (order) => toMainOrderStatus(order.status) === 'accepted' && (order.payment_status ?? 'pending') === 'paid',
+  );
+
+  function getFinancialOrderDate(order: Order): Date | null {
+    const parsed = new Date(order.preferred_datetime ?? order.created_at);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed;
+  }
 
   const now = new Date();
   const chartMap = new Map<string, ChartPoint>();
@@ -76,9 +96,9 @@ export function FinancialOverview() {
     existing.orders += 1;
   }
 
-  for (const order of acceptedOrders) {
-    const orderDate = new Date(order.created_at);
-    if (Number.isNaN(orderDate.getTime())) continue;
+  for (const order of acceptedPaidOrders) {
+    const orderDate = getFinancialOrderDate(order);
+    if (!orderDate) continue;
 
     if (timeframe === 'day') {
       const dayKey = now.toISOString().slice(0, 10);
@@ -128,10 +148,10 @@ export function FinancialOverview() {
   }
 
   const selectedKey = selectedPeriodKey ?? chartData[0]?.key ?? null;
-  const selectedOrders = acceptedOrders.filter((order) => {
+  const selectedOrders = acceptedPaidOrders.filter((order) => {
     if (!selectedKey) return false;
-    const orderDate = new Date(order.created_at);
-    if (Number.isNaN(orderDate.getTime())) return false;
+    const orderDate = getFinancialOrderDate(order);
+    if (!orderDate) return false;
 
     if (timeframe === 'day') {
       return orderDate.toISOString().slice(0, 10) === selectedKey;
@@ -174,6 +194,44 @@ export function FinancialOverview() {
         : timeframe === 'year'
           ? 'This year'
           : 'All time';
+
+  const worksheet = useMemo(() => buildIngredientWorksheet(quickAddCounts), [quickAddCounts]);
+
+  function incrementSku(skuId: string, amount: number) {
+    setQuickAddCounts((current) => {
+      const next = Math.max(0, (current[skuId] ?? 0) + amount);
+      return {
+        ...current,
+        [skuId]: next,
+      };
+    });
+  }
+
+  function updateQuickAddDraft(skuId: string, value: string) {
+    if (!/^\d*$/.test(value)) return;
+
+    setQuickAddDrafts((current) => ({
+      ...current,
+      [skuId]: value,
+    }));
+  }
+
+  function applyQuickAddDraft(skuId: string) {
+    const raw = quickAddDrafts[skuId] ?? '';
+    const amount = Number(raw);
+    if (!Number.isInteger(amount) || amount <= 0) return;
+
+    incrementSku(skuId, amount);
+    setQuickAddDrafts((current) => ({
+      ...current,
+      [skuId]: '',
+    }));
+  }
+
+  function resetWorksheet() {
+    setQuickAddCounts({});
+    setQuickAddDrafts({});
+  }
 
   return (
     <div className="space-y-6">
@@ -282,7 +340,7 @@ export function FinancialOverview() {
         <h2 className="text-2xl font-semibold mb-6 golden-line pl-4">Orders for Selected Period</h2>
         <div className="space-y-3">
           {selectedOrders.length === 0 ? (
-            <p className="text-center text-brand-light-gray py-8">No accepted orders for the selected period</p>
+            <p className="text-center text-brand-light-gray py-8">No accepted and paid orders for the selected period</p>
           ) : (
             selectedOrders.map((order) => (
               <div key={order.id} className="flex items-center justify-between p-4 bg-brand-charcoal rounded-lg">
@@ -290,13 +348,139 @@ export function FinancialOverview() {
                   <p className="font-semibold">{order.items.map((item) => item.product_name).join(', ')}</p>
                   <p className="text-sm text-brand-light-gray">{order.customer_name}</p>
                   <p className="text-xs text-brand-light-gray">
-                    {new Date(order.created_at).toLocaleString()} • Payment: {order.payment_status ?? 'arranged'} • Fulfillment: {order.fulfillment_status ?? 'not_started'}
+                    {new Date(order.preferred_datetime ?? order.created_at).toLocaleString()} • Payment: {order.payment_status ?? 'pending'} • Fulfillment: {order.fulfillment_status ?? 'not_started'}
                   </p>
                 </div>
                 <p className="font-bold gold-accent">{formatCurrency(order.total)}</p>
               </div>
             ))
           )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+        <div className="premium-card p-6 xl:col-span-2">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-semibold golden-line pl-4">Quick Add Production</h2>
+            <Button variant="outline" className="btn-outline-gold" onClick={resetWorksheet}>
+              Reset
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            {QUICK_ADD_SKUS.map((sku) => (
+              <div
+                key={sku.id}
+                className="p-4 bg-brand-charcoal rounded-lg border border-brand-dark-gray"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="font-semibold">{sku.label}</p>
+                    <p className="text-xs text-brand-light-gray">Revenue/unit: ${sku.revenuePerUnit.toFixed(2)}</p>
+                  </div>
+                  <p className="text-lg font-bold gold-accent">{quickAddCounts[sku.id] ?? 0}</p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="btn-outline-gold"
+                    onClick={() => incrementSku(sku.id, -1)}
+                    aria-label={`decrease ${sku.label}`}
+                  >
+                    <CircleMinus className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="btn-primary-gold"
+                    onClick={() => incrementSku(sku.id, 1)}
+                    aria-label={`increase ${sku.label}`}
+                  >
+                    <CirclePlus className="w-4 h-4" />
+                  </Button>
+
+                  <div className="ml-auto flex items-center gap-2 min-w-0">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={quickAddDrafts[sku.id] ?? ''}
+                      onChange={(event) => updateQuickAddDraft(sku.id, event.target.value)}
+                      placeholder="Add number"
+                      className="h-9 w-28 rounded-md border border-brand-dark-gray bg-black/30 px-2 text-sm text-white placeholder:text-brand-light-gray/70 focus:border-brand-gold focus:outline-none"
+                      aria-label={`${sku.label} add number`}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="btn-outline-gold"
+                      onClick={() => applyQuickAddDraft(sku.id)}
+                      disabled={!quickAddDrafts[sku.id] || Number(quickAddDrafts[sku.id]) <= 0}
+                      aria-label="apply quantity"
+                    >
+                      <Check className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="premium-card p-6 xl:col-span-3">
+          <div className="mb-6">
+            <h2 className="text-2xl font-semibold golden-line pl-4">Ingredient Worksheet</h2>
+            <p className="text-sm text-brand-light-gray mt-2">
+              Live estimate from quick-add quantities. Replace with real recipe/cost tables when backend is connected.
+            </p>
+          </div>
+
+          {worksheet.rows.length === 0 ? (
+            <div className="text-center py-12 text-brand-light-gray">
+              <p>Add products with quick-add to generate ingredient requirements.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="border-brand-dark-gray hover:bg-transparent">
+                  <TableHead>Ingredient</TableHead>
+                  <TableHead className="text-right">Qty Required</TableHead>
+                  <TableHead className="text-right">Unit Cost</TableHead>
+                  <TableHead className="text-right">Extended Cost</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {worksheet.rows.map((row) => (
+                  <TableRow key={row.ingredientId} className="border-brand-dark-gray hover:bg-brand-charcoal">
+                    <TableCell>{row.ingredientName}</TableCell>
+                    <TableCell className="text-right">{row.quantityRequiredDisplay}</TableCell>
+                    <TableCell className="text-right">${row.unitCost.toFixed(4)}</TableCell>
+                    <TableCell className="text-right">${row.extendedCost.toFixed(2)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-lg bg-brand-charcoal border border-brand-dark-gray">
+              <p className="text-sm text-brand-light-gray mb-1">Total Ingredient Cost</p>
+              <p className="text-2xl font-bold">${worksheet.totals.totalIngredientCost.toFixed(2)}</p>
+            </div>
+            <div className="p-4 rounded-lg bg-brand-charcoal border border-brand-dark-gray">
+              <p className="text-sm text-brand-light-gray mb-1">Total Revenue</p>
+              <p className="text-2xl font-bold gold-accent">${worksheet.totals.totalRevenue.toFixed(2)}</p>
+            </div>
+            <div className="p-4 rounded-lg bg-brand-charcoal border border-brand-dark-gray">
+              <p className="text-sm text-brand-light-gray mb-1">Estimated Gross Profit</p>
+              <p className={`text-2xl font-bold ${worksheet.totals.estimatedGrossProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                ${worksheet.totals.estimatedGrossProfit.toFixed(2)}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

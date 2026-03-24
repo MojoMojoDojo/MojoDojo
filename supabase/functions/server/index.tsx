@@ -169,8 +169,37 @@ app.post("/make-server-44229999/init", async (c) => {
 // Sign up new user
 app.post("/make-server-44229999/auth/signup", async (c) => {
   try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    if (!accessToken) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const { data: requesterData, error: requesterError } = await supabase.auth.getUser(accessToken);
+    if (requesterError || !requesterData?.user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const { data: requesterProfile, error: requesterProfileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', requesterData.user.id)
+      .maybeSingle();
+
+    const requesterRole = requesterProfile?.role ?? (requesterData.user.user_metadata?.role as string | undefined);
+    if (requesterRole !== 'admin') {
+      return c.json({ error: 'Only admins can create users' }, 403);
+    }
+
     const body = await c.req.json();
     const { email, password, name, role = 'worker' } = body;
+
+    if (!email || !password) {
+      return c.json({ error: 'Email and password are required' }, 400);
+    }
+
+    if (!['admin', 'worker'].includes(role)) {
+      return c.json({ error: 'Role must be admin or worker' }, 400);
+    }
 
     const { data, error } = await supabase.auth.admin.createUser({
       email,
@@ -184,6 +213,15 @@ app.post("/make-server-44229999/auth/signup", async (c) => {
       console.error('Signup error:', error);
       return c.json({ error: error.message }, 400);
     }
+
+    await supabase
+      .from('profiles')
+      .upsert({
+        id: data.user.id,
+        email,
+        full_name: name || null,
+        role,
+      });
 
     // Store user role and info in KV
     await kv.set(`user:${data.user.id}`, {
