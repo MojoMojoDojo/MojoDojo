@@ -19,16 +19,8 @@ import {
 
 const ORDER_FILTERS: MainOrderStatus[] = ['all', 'request_received', 'under_review', 'accepted', 'rejected'];
 
-const MAIN_STATUS_OPTIONS: Exclude<MainOrderStatus, 'all'>[] = [
-  'request_received',
-  'under_review',
-  'accepted',
-  'rejected',
-];
-
-const PAYMENT_STATUS_OPTIONS: NonNullable<Order['payment_status']>[] = ['arranged', 'pending', 'paid'];
+const PAYMENT_STATUS_OPTIONS: NonNullable<Order['payment_status']>[] = ['pending', 'paid'];
 const PAYMENT_STATUS_LABELS: Record<NonNullable<Order['payment_status']>, string> = {
-  arranged: 'Arranged',
   pending: 'Pending',
   paid: 'Paid',
 };
@@ -102,7 +94,8 @@ export function OrdersManagement() {
       toast.success(successMessage);
     } catch (error) {
       console.error('Failed to update order:', error);
-      toast.error('Failed to update order');
+      const message = error instanceof Error ? error.message : 'Failed to update order';
+      toast.error(message);
     } finally {
       setUpdatingOrderId(null);
     }
@@ -112,15 +105,45 @@ export function OrdersManagement() {
     await updateOrder(orderId, { internal_notes: noteDrafts[orderId] ?? '' }, 'Internal note saved');
   }
 
-  async function markAsReviewed(orderId: string) {
-    await updateOrder(orderId, { status: 'under_review' }, 'Order moved to review');
+  function buildConfirmationMessage(order: Order, action: 'accept' | 'reject'): string {
+    const actionLabel = action === 'accept' ? 'ACCEPT' : 'REJECT';
+    return [
+      `Are you sure you want to ${action} this order?`,
+      '',
+      `Order: ${order.id}`,
+      `Customer: ${order.customer_name}`,
+      `Email: ${order.customer_email}`,
+      `Phone: ${order.customer_phone}`,
+      `Total: $${order.total.toFixed(2)}`,
+      `Requested: ${formatPreferredDateTime(order.preferred_datetime)}`,
+      '',
+      `Type ${actionLabel} to continue in your workflow.`,
+    ].join('\n');
   }
 
   async function acceptOrder(orderId: string) {
-    await updateOrder(orderId, { status: 'accepted' }, 'Order accepted');
+    const order = orders.find((item) => item.id === orderId);
+    if (!order) return;
+
+    if (!window.confirm(buildConfirmationMessage(order, 'accept'))) return;
+
+    await updateOrder(
+      orderId,
+      {
+        status: 'accepted',
+        payment_status: order.payment_status ?? 'pending',
+        fulfillment_status: order.fulfillment_status ?? 'not_started',
+      },
+      'Order accepted',
+    );
   }
 
   async function rejectOrder(orderId: string) {
+    const order = orders.find((item) => item.id === orderId);
+    if (!order) return;
+
+    if (!window.confirm(buildConfirmationMessage(order, 'reject'))) return;
+
     await updateOrder(orderId, { status: 'rejected' }, 'Order rejected');
   }
 
@@ -184,26 +207,61 @@ export function OrdersManagement() {
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredOrders.map((order) => (
+            {filteredOrders.map((order, index) => (
               <div
                 key={order.id}
-                className="p-6 bg-brand-charcoal rounded-lg border border-brand-dark-gray"
+                className="rounded-lg border border-brand-dark-gray border-l-4 border-l-brand-gold bg-brand-charcoal p-6"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-1">{order.customer_name}</h3>
-                    <p className="text-sm text-brand-light-gray">{order.customer_email}</p>
-                    <p className="text-sm text-brand-light-gray">{order.customer_phone}</p>
+                <div className="mb-4 flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-10 min-w-10 items-center justify-center rounded-lg border border-brand-gold/60 bg-brand-gold/10 px-2 text-sm font-bold text-brand-gold">
+                      #{index + 1}
+                    </div>
+                    <div>
+                      <p className="text-xs text-brand-light-gray">Order ID: {order.id}</p>
+                      <h3 className="mb-1 text-lg font-semibold">{order.customer_name}</h3>
+                      <p className="text-sm text-brand-light-gray">{order.customer_email}</p>
+                      <p className="text-sm text-brand-light-gray">{order.customer_phone}</p>
+                      <div className={`mt-2 inline-flex status-badge ${
+                        ['request_received', 'under_review'].includes(toMainOrderStatus(order.status))
+                          ? 'status-pending'
+                          : toMainOrderStatus(order.status) === 'accepted'
+                            ? 'status-available'
+                            : 'status-sold-out'
+                      }`}>
+                        {MAIN_ORDER_STATUS_LABELS[toMainOrderStatus(order.status)]}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold gold-accent">${order.total.toFixed(2)}</p>
-                    <p className="text-xs text-brand-light-gray mt-1">
-                      {new Date(order.created_at).toLocaleString()}
-                    </p>
+                  <div className="flex flex-col items-end gap-3">
+                    <div className="text-right">
+                      <p className="text-2xl font-bold gold-accent">${order.total.toFixed(2)}</p>
+                      <p className="mt-1 text-xs text-brand-light-gray">
+                        {new Date(order.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => acceptOrder(order.id)}
+                        disabled={!canManage || updatingOrderId === order.id || toMainOrderStatus(order.status) === 'accepted'}
+                        className="h-9 rounded-lg border border-green-500/40 bg-green-500/10 px-3 text-sm text-green-300 transition-all hover:bg-green-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => rejectOrder(order.id)}
+                        disabled={!canManage || updatingOrderId === order.id || toMainOrderStatus(order.status) === 'rejected'}
+                        className="h-9 rounded-lg border border-red-500/40 bg-red-500/10 px-3 text-sm text-red-300 transition-all hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Reject
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm">
+                <div className="mb-4 grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
                   <div>
                     <span className="text-brand-light-gray">Delivery Type:</span>{' '}
                     <span className="capitalize">{order.delivery_type}</span>
@@ -213,7 +271,7 @@ export function OrdersManagement() {
                     <span>{formatPreferredDateTime(order.preferred_datetime)}</span>
                   </div>
                   <div>
-                    <span className="text-brand-light-gray">Payment:</span>{' '}
+                    <span className="text-brand-light-gray">Payment Method:</span>{' '}
                     <span className="capitalize">{order.payment_method ?? 'arranged_after_approval'}</span>
                   </div>
                   {order.delivery_address && (
@@ -231,7 +289,7 @@ export function OrdersManagement() {
                 </div>
 
                 <div className="mb-4">
-                  <h4 className="font-semibold mb-2">Items:</h4>
+                  <h4 className="mb-2 font-semibold">Items:</h4>
                   <ul className="space-y-1">
                     {order.items.map((item, idx) => (
                       <li key={idx} className="text-sm text-brand-light-gray">
@@ -242,7 +300,7 @@ export function OrdersManagement() {
                 </div>
 
                 <div className="mb-4">
-                  <h4 className="font-semibold mb-2">Internal Notes</h4>
+                  <h4 className="mb-2 font-semibold">Internal Notes</h4>
                   <div className="flex flex-col gap-2 md:flex-row md:items-start">
                     <textarea
                       value={noteDrafts[order.id] ?? ''}
@@ -267,107 +325,51 @@ export function OrdersManagement() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4">
-                  <Select
-                    value={toMainOrderStatus(order.status)}
-                    onValueChange={(value) =>
-                      updateOrder(order.id, { status: value as Exclude<MainOrderStatus, 'all'> }, 'Order status updated')
-                    }
-                    disabled={!canManage || updatingOrderId === order.id}
-                  >
-                    <SelectTrigger className="w-48 bg-brand-charcoal border-brand-dark-gray text-brand-off-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-brand-charcoal border-brand-dark-gray text-brand-off-white">
-                      {MAIN_STATUS_OPTIONS.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {MAIN_ORDER_STATUS_LABELS[status]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                {toMainOrderStatus(order.status) === 'accepted' ? (
+                  <div className="flex flex-wrap items-center gap-4">
+                    <Select
+                      value={order.payment_status ?? 'pending'}
+                      onValueChange={(value) =>
+                        updateOrder(order.id, { payment_status: value as Order['payment_status'] }, 'Payment status updated')
+                      }
+                      disabled={!canManage || updatingOrderId === order.id}
+                    >
+                      <SelectTrigger className="w-48 bg-brand-charcoal border-brand-dark-gray text-brand-off-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-brand-charcoal border-brand-dark-gray text-brand-off-white">
+                        {PAYMENT_STATUS_OPTIONS.map((status) => (
+                          <SelectItem key={status} value={status}>
+                            Payment: {PAYMENT_STATUS_LABELS[status]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-                  <div className={`status-badge ${
-                    ['request_received', 'under_review'].includes(toMainOrderStatus(order.status))
-                      ? 'status-pending'
-                      : toMainOrderStatus(order.status) === 'accepted'
-                        ? 'status-available'
-                        : 'status-sold-out'
-                  }`}>
-                    {MAIN_ORDER_STATUS_LABELS[toMainOrderStatus(order.status)]}
+                    <Select
+                      value={order.fulfillment_status ?? 'not_started'}
+                      onValueChange={(value) =>
+                        updateOrder(order.id, { fulfillment_status: value as Order['fulfillment_status'] }, 'Fulfillment status updated')
+                      }
+                      disabled={!canManage || updatingOrderId === order.id}
+                    >
+                      <SelectTrigger className="w-52 bg-brand-charcoal border-brand-dark-gray text-brand-off-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-brand-charcoal border-brand-dark-gray text-brand-off-white">
+                        {FULFILLMENT_STATUS_OPTIONS.map((status) => (
+                          <SelectItem key={status} value={status}>
+                            Fulfillment: {FULFILLMENT_STATUS_LABELS[status]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-
-                  {toMainOrderStatus(order.status) !== order.status && (
-                    <div className="text-xs text-brand-light-gray">
-                      Sub-status: {order.status.replaceAll('_', ' ')}
-                    </div>
-                  )}
-
-                  <Select
-                    value={order.payment_status ?? 'arranged'}
-                    onValueChange={(value) =>
-                      updateOrder(order.id, { payment_status: value as Order['payment_status'] }, 'Payment status updated')
-                    }
-                    disabled={!canManage || updatingOrderId === order.id}
-                  >
-                    <SelectTrigger className="w-48 bg-brand-charcoal border-brand-dark-gray text-brand-off-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-brand-charcoal border-brand-dark-gray text-brand-off-white">
-                      {PAYMENT_STATUS_OPTIONS.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          Payment: {PAYMENT_STATUS_LABELS[status]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select
-                    value={order.fulfillment_status ?? 'not_started'}
-                    onValueChange={(value) =>
-                      updateOrder(order.id, { fulfillment_status: value as Order['fulfillment_status'] }, 'Fulfillment status updated')
-                    }
-                    disabled={!canManage || updatingOrderId === order.id}
-                  >
-                    <SelectTrigger className="w-52 bg-brand-charcoal border-brand-dark-gray text-brand-off-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-brand-charcoal border-brand-dark-gray text-brand-off-white">
-                      {FULFILLMENT_STATUS_OPTIONS.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          Fulfillment: {FULFILLMENT_STATUS_LABELS[status]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => markAsReviewed(order.id)}
-                      disabled={!canManage || updatingOrderId === order.id}
-                      className="h-9 rounded-lg border border-brand-dark-gray bg-brand-dark-gray px-3 text-sm text-brand-off-white transition-all hover:border-brand-gold disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Review
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => acceptOrder(order.id)}
-                      disabled={!canManage || updatingOrderId === order.id}
-                      className="h-9 rounded-lg border border-green-500/40 bg-green-500/10 px-3 text-sm text-green-300 transition-all hover:bg-green-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Accept
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => rejectOrder(order.id)}
-                      disabled={!canManage || updatingOrderId === order.id}
-                      className="h-9 rounded-lg border border-red-500/40 bg-red-500/10 px-3 text-sm text-red-300 transition-all hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Reject
-                    </button>
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-xs text-brand-light-gray">
+                    Payment and fulfillment controls unlock after this order is accepted.
+                  </p>
+                )}
               </div>
             ))}
           </div>

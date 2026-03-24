@@ -54,6 +54,106 @@ function sortOrdersNewestFirst(orders: Order[]): Order[] {
   return [...orders].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'item';
+}
+
+function withFallbackValue(row: Record<string, unknown>, column: string, orderId: string): Record<string, unknown> {
+  const quantity = Number(row.quantity ?? 1) || 1;
+  const unitPrice = Number(row.unit_price ?? row.price ?? 0) || 0;
+  const productName = String(row.product_name_en ?? row.product_name ?? row.product_id ?? 'Item');
+  const baseSlug = String(row.product_slug ?? row.product_id ?? productName);
+
+  switch (column) {
+    case 'order_id':
+      return { ...row, order_id: orderId };
+    case 'product_slug':
+      return { ...row, product_slug: slugify(baseSlug) };
+    case 'product_name':
+      return { ...row, product_name: productName };
+    case 'product_name_en':
+      return { ...row, product_name_en: productName };
+    case 'product_name_fr':
+      return { ...row, product_name_fr: productName };
+    case 'product_id':
+      return { ...row, product_id: String(row.product_id ?? slugify(baseSlug)) };
+    case 'quantity':
+      return { ...row, quantity: 1 };
+    case 'price':
+      return { ...row, price: unitPrice };
+    case 'unit_price':
+      return { ...row, unit_price: unitPrice };
+    case 'line_total':
+      return { ...row, line_total: Number((unitPrice * quantity).toFixed(2)) };
+    case 'variant_key':
+      return { ...row, variant_key: 'default' };
+    case 'variant_name_en':
+      return { ...row, variant_name_en: 'Default' };
+    case 'variant_name_fr':
+      return { ...row, variant_name_fr: 'Default' };
+    default:
+      return { ...row, [column]: '' };
+  }
+}
+
+async function insertOrderItemsWithCompatibility(orderId: string, items: Order['items']) {
+  let payload: Array<Record<string, unknown>> = items.map((item) => {
+    const quantity = Number(item.quantity ?? 1) || 1;
+    const unitPrice = Number(item.price ?? 0) || 0;
+    const name = String(item.product_name ?? 'Item');
+    const productSlug = slugify(item.product_id || name);
+
+    return {
+      order_id: orderId,
+      product_id: item.product_id,
+      product_slug: productSlug,
+      product_name: name,
+      product_name_en: name,
+      product_name_fr: name,
+      variant_key: 'default',
+      variant_name_en: 'Default',
+      variant_name_fr: 'Default',
+      quantity,
+      price: unitPrice,
+      unit_price: unitPrice,
+      line_total: Number((unitPrice * quantity).toFixed(2)),
+      customization: item.customization ?? null,
+    };
+  });
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const { error } = await supabase.from('order_items').insert(payload);
+
+    if (!error) {
+      return;
+    }
+
+    const message = error.message ?? '';
+    const missingColumn = message.match(/column "([a-zA-Z0-9_]+)" of relation "order_items" does not exist/i)?.[1];
+    if (missingColumn) {
+      payload = payload.map((row) => {
+        const { [missingColumn]: _removed, ...rest } = row;
+        return rest;
+      });
+      continue;
+    }
+
+    const nullColumn = message.match(/null value in column "([a-zA-Z0-9_]+)"/i)?.[1];
+    if (nullColumn) {
+      payload = payload.map((row) => withFallbackValue(row, nullColumn, orderId));
+      continue;
+    }
+
+    throw new Error(message || 'Failed to save order items');
+  }
+
+  throw new Error('Failed to save order items after compatibility retries');
+}
+
 function mapOrderRowsToOrders(orderRows: OrderRow[], itemRows: OrderItemRow[]): Order[] {
   const itemsByOrder = new Map<string, OrderItemRow[]>();
 
@@ -282,21 +382,12 @@ export const api = {
       }
 
       const orderItems = Array.isArray(order.items) ? order.items : [];
-      const itemPayload = orderItems.map((item) => ({
-        order_id: insertedOrder.id,
-        product_id: item.product_id,
-        product_name: item.product_name,
-        quantity: item.quantity,
-        price: item.price,
-        customization: item.customization ?? null,
-      }));
-
-      if (itemPayload.length > 0) {
-        const { error: itemsInsertError } = await supabase.from('order_items').insert(itemPayload);
-
-        if (itemsInsertError) {
+      if (orderItems.length > 0) {
+        try {
+          await insertOrderItemsWithCompatibility(insertedOrder.id, orderItems);
+        } catch (itemsError) {
           await supabase.from('orders').delete().eq('id', insertedOrder.id);
-          throw new Error(itemsInsertError.message || 'Failed to save order items');
+          throw itemsError;
         }
       }
 
