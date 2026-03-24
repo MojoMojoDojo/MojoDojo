@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select';
+import { Info } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   MAIN_ORDER_STATUS_LABELS,
@@ -43,8 +44,10 @@ export function OrdersManagement() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<MainOrderStatus>('all');
+  const [dateSortMode, setDateSortMode] = useState<'none' | 'newest' | 'oldest'>('none');
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [openInfoByOrderId, setOpenInfoByOrderId] = useState<Record<string, boolean>>({});
 
   const canManage = canManageSensitiveBusinessData(user?.role);
 
@@ -151,6 +154,19 @@ export function OrdersManagement() {
     ? orders
     : orders.filter((order) => toMainOrderStatus(order.status) === filter);
 
+  const displayOrders = [...filteredOrders].sort((a, b) => {
+    if (dateSortMode === 'none') return 0;
+
+    const aTime = new Date(a.preferred_datetime ?? a.created_at).getTime();
+    const bTime = new Date(b.preferred_datetime ?? b.created_at).getTime();
+
+    if (dateSortMode === 'newest') {
+      return bTime - aTime;
+    }
+
+    return aTime - bTime;
+  });
+
   function formatPreferredDateTime(value?: string) {
     if (!value) return '—';
 
@@ -160,6 +176,27 @@ export function OrdersManagement() {
     }
 
     return parsed.toLocaleString();
+  }
+
+  function formatRequestSent(value: string) {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString();
+  }
+
+  function toggleInfo(orderId: string) {
+    setOpenInfoByOrderId((current) => ({
+      ...current,
+      [orderId]: !current[orderId],
+    }));
+  }
+
+  function cycleDateSortMode() {
+    setDateSortMode((current) => {
+      if (current === 'none') return 'newest';
+      if (current === 'newest') return 'oldest';
+      return 'none';
+    });
   }
 
   return (
@@ -194,7 +231,20 @@ export function OrdersManagement() {
       </div>
 
       {/* Orders List */}
-      <div className="premium-card p-6">
+      <div>
+        <div className="mb-3">
+          <button
+            type="button"
+            onClick={cycleDateSortMode}
+            className="inline-flex items-center gap-2 rounded-lg border border-brand-dark-gray bg-brand-dark-gray px-3 py-2 text-sm text-brand-off-white transition-all hover:border-brand-gold"
+          >
+            <span>Order Date</span>
+            <span className="tracking-tight">
+              {dateSortMode === 'none' ? '↑↓' : dateSortMode === 'newest' ? '↓' : '↑'}
+            </span>
+          </button>
+        </div>
+
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
@@ -206,8 +256,8 @@ export function OrdersManagement() {
             <p>No {filter !== 'all' ? MAIN_ORDER_STATUS_LABELS[filter].toLowerCase() : ''} orders found</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {filteredOrders.map((order, index) => (
+          <div className="space-y-3">
+            {displayOrders.map((order, index) => (
               <div
                 key={order.id}
                 className="rounded-lg border border-brand-dark-gray border-l-4 border-l-brand-gold bg-brand-charcoal p-6"
@@ -218,10 +268,10 @@ export function OrdersManagement() {
                       #{index + 1}
                     </div>
                     <div>
-                      <p className="text-xs text-brand-light-gray">Order ID: {order.id}</p>
                       <h3 className="mb-1 text-lg font-semibold">{order.customer_name}</h3>
-                      <p className="text-sm text-brand-light-gray">{order.customer_email}</p>
-                      <p className="text-sm text-brand-light-gray">{order.customer_phone}</p>
+                      <p className="text-sm font-medium text-brand-off-white">
+                        Order Date: <span className="gold-accent">{formatPreferredDateTime(order.preferred_datetime)}</span>
+                      </p>
                       <div className={`mt-2 inline-flex status-badge ${
                         ['request_received', 'under_review'].includes(toMainOrderStatus(order.status))
                           ? 'status-pending'
@@ -236,11 +286,16 @@ export function OrdersManagement() {
                   <div className="flex flex-col items-end gap-3">
                     <div className="text-right">
                       <p className="text-2xl font-bold gold-accent">${order.total.toFixed(2)}</p>
-                      <p className="mt-1 text-xs text-brand-light-gray">
-                        {new Date(order.created_at).toLocaleString()}
-                      </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleInfo(order.id)}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg border border-brand-dark-gray bg-brand-dark-gray px-3 text-sm text-brand-off-white transition-all hover:border-brand-gold"
+                      >
+                        <Info className="h-4 w-4" />
+                        Info
+                      </button>
                       <button
                         type="button"
                         onClick={() => acceptOrder(order.id)}
@@ -266,14 +321,6 @@ export function OrdersManagement() {
                     <span className="text-brand-light-gray">Delivery Type:</span>{' '}
                     <span className="capitalize">{order.delivery_type}</span>
                   </div>
-                  <div>
-                    <span className="text-brand-light-gray">Preferred Date/Time:</span>{' '}
-                    <span>{formatPreferredDateTime(order.preferred_datetime)}</span>
-                  </div>
-                  <div>
-                    <span className="text-brand-light-gray">Payment Method:</span>{' '}
-                    <span className="capitalize">{order.payment_method ?? 'arranged_after_approval'}</span>
-                  </div>
                   {order.delivery_address && (
                     <div className="md:col-span-2">
                       <span className="text-brand-light-gray">Address:</span>{' '}
@@ -288,6 +335,53 @@ export function OrdersManagement() {
                   )}
                 </div>
 
+                {openInfoByOrderId[order.id] ? (
+                  <div className="mb-4 rounded-lg border border-brand-dark-gray bg-brand-black/40 p-4">
+                    <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
+                      <p><span className="text-brand-light-gray">Order ID:</span> {order.id}</p>
+                      <p><span className="text-brand-light-gray">Email:</span> {order.customer_email}</p>
+                      <p><span className="text-brand-light-gray">Phone:</span> {order.customer_phone}</p>
+                      <p>
+                        <span className="text-brand-light-gray">Payment Method:</span>{' '}
+                        <span className="capitalize">{order.payment_method ?? 'arranged_after_approval'}</span>
+                      </p>
+                      <p className="md:col-span-2">
+                        <span className="text-brand-light-gray">Internal Note:</span>{' '}
+                        <span>{(order.internal_notes ?? '').trim() || 'None yet'}</span>
+                      </p>
+                      <p className="md:col-span-2">
+                        <span className="text-brand-light-gray">Request Sent Time:</span> {formatRequestSent(order.created_at)}
+                      </p>
+                    </div>
+
+                    <div className="mt-4">
+                      <h4 className="mb-2 font-semibold">Internal Notes</h4>
+                      <div className="flex flex-col gap-2 md:flex-row md:items-start">
+                        <textarea
+                          value={noteDrafts[order.id] ?? ''}
+                          onChange={(event) =>
+                            setNoteDrafts((current) => ({
+                              ...current,
+                              [order.id]: event.target.value,
+                            }))
+                          }
+                          disabled={!canManage}
+                          placeholder="Add internal notes for this order"
+                          className="min-h-20 w-full rounded-lg border border-brand-dark-gray bg-brand-black px-3 py-2 text-sm text-brand-off-white focus:border-brand-gold focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                        />
+                        <button
+                          type="button"
+                          disabled={!canManage || updatingOrderId === order.id}
+                          onClick={() => saveInternalNote(order.id)}
+                          className="h-10 rounded-lg bg-brand-gold px-4 text-sm font-semibold text-brand-black transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Save note
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="mb-4">
                   <h4 className="mb-2 font-semibold">Items:</h4>
                   <ul className="space-y-1">
@@ -297,32 +391,6 @@ export function OrdersManagement() {
                       </li>
                     ))}
                   </ul>
-                </div>
-
-                <div className="mb-4">
-                  <h4 className="mb-2 font-semibold">Internal Notes</h4>
-                  <div className="flex flex-col gap-2 md:flex-row md:items-start">
-                    <textarea
-                      value={noteDrafts[order.id] ?? ''}
-                      onChange={(event) =>
-                        setNoteDrafts((current) => ({
-                          ...current,
-                          [order.id]: event.target.value,
-                        }))
-                      }
-                      disabled={!canManage}
-                      placeholder="Add internal notes for this order"
-                      className="min-h-20 w-full rounded-lg border border-brand-dark-gray bg-brand-black px-3 py-2 text-sm text-brand-off-white focus:border-brand-gold focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                    />
-                    <button
-                      type="button"
-                      disabled={!canManage || updatingOrderId === order.id}
-                      onClick={() => saveInternalNote(order.id)}
-                      className="h-10 rounded-lg bg-brand-gold px-4 text-sm font-semibold text-brand-black transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Save note
-                    </button>
-                  </div>
                 </div>
 
                 {toMainOrderStatus(order.status) === 'accepted' ? (

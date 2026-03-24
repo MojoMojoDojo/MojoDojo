@@ -71,7 +71,7 @@ export function HomePage() {
             y: { duration: 6.2, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' },
             boxShadow: { duration: 3.2, repeat: Infinity, repeatType: 'loop', ease: 'easeInOut' },
           }}
-          className="absolute z-20 left-4 sm:left-7 md:left-12 lg:left-16 top-24 sm:top-28 md:top-32
+          className="absolute z-20 left-20 sm:left-24 md:left-36 lg:left-48 top-28 sm:top-32 md:top-36
                      inline-flex items-center gap-1.5 rounded-full border border-blue-400/45 bg-black/55
                      px-2.5 py-1.5 text-[11px] sm:text-xs font-medium text-blue-100 backdrop-blur-md
                      transition-colors hover:text-white hover:border-blue-300/70"

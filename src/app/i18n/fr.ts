@@ -112,7 +112,7 @@ export const fr: Translations = {
           name: 'Michael Haddad',
           nickname: 'FatMike',
           role: 'Développeur logiciel',
-          bio: "Bâtit l'infrastructure numérique qui propulse les opérations et l'expérience client de MojoDojo.",
+          bio: 'Construit ce site web avec amour ❤️',
         },
       ],
     },

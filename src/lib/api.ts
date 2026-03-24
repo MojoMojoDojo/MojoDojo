@@ -1,5 +1,6 @@
+import { createClient } from '@supabase/supabase-js';
 import type { Product, Order, Ingredient, GalleryItem } from './supabase';
-import { supabase, supabaseFunctionAnonKey, supabaseUrl } from './supabase';
+import { supabase, supabaseAnonKey, supabaseFunctionAnonKey, supabaseUrl } from './supabase';
 
 const API_BASE = `${supabaseUrl}/functions/v1/make-server-44229999`;
 
@@ -222,6 +223,20 @@ async function apiCall(endpoint: string, options: ApiOptions = {}) {
   }
 }
 
+function getSupabaseForToken(token?: string) {
+  if (!token) {
+    return supabase;
+  }
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  });
+}
+
 export const api = {
   // Initialization
   async initialize() {
@@ -257,15 +272,12 @@ export const api = {
   // Orders
   orders: {
     async getAll(token?: string): Promise<{ orders: Order[] }> {
-      const authClient = token ? supabase.auth.setSession : null;
-      if (authClient) {
-        // Keep API compatible without forcing session changes.
-      }
+      const db = getSupabaseForToken(token);
 
       let orderRows: any[] | null = null;
       let ordersError: { message?: string } | null = null;
 
-      const response = await supabase
+      const response = await db
         .from('orders')
         .select('*')
         .order('created_at', { ascending: false });
@@ -282,7 +294,7 @@ export const api = {
         return { orders: [] };
       }
 
-      const { data: itemRows, error: itemsError } = await supabase
+      const { data: itemRows, error: itemsError } = await db
         .from('order_items')
         .select('order_id, product_id, product_name, quantity, price, customization')
         .in('order_id', ids);
@@ -415,6 +427,8 @@ export const api = {
     },
 
     async update(id: string, updates: Partial<Order>, token: string) {
+      const db = getSupabaseForToken(token);
+
       const status = updates.status;
       if (status && !['request_received', 'under_review', 'accepted', 'rejected'].includes(status)) {
         throw new Error('Invalid status update');
@@ -440,14 +454,13 @@ export const api = {
         updated_at: new Date().toISOString(),
       };
 
-      const richResponse = await supabase
+      const richResponse = await db
         .from('orders')
         .update(updatePayload)
         .eq('id', id)
-        .select('*')
-        .single();
+        .select('*');
 
-      let updatedOrder = richResponse.data;
+      let updatedRows = richResponse.data;
       let updateError = richResponse.error;
 
       if (updateError && /fulfillment_status|internal_notes/i.test(updateError.message ?? '')) {
@@ -457,22 +470,40 @@ export const api = {
           updated_at: new Date().toISOString(),
         };
 
-        const legacyResponse = await supabase
+        const legacyResponse = await db
           .from('orders')
           .update(legacyPayload)
           .eq('id', id)
-          .select('*')
-          .single();
+          .select('*');
 
-        updatedOrder = legacyResponse.data;
+        updatedRows = legacyResponse.data;
         updateError = legacyResponse.error;
       }
 
-      if (updateError || !updatedOrder) {
+      if (updateError) {
         throw new Error(updateError?.message || 'Failed to update order');
       }
 
-      const { data: itemRows, error: itemsError } = await supabase
+      let updatedOrder = (updatedRows ?? [])[0];
+      if (!updatedOrder) {
+        const verification = await db
+          .from('orders')
+          .select('*')
+          .eq('id', id)
+          .limit(1);
+
+        if (verification.error) {
+          throw new Error(verification.error.message || 'Order update affected 0 rows. Check admin permissions or RLS policies.');
+        }
+
+        updatedOrder = (verification.data ?? [])[0];
+      }
+
+      if (!updatedOrder) {
+        throw new Error('Order update affected 0 rows. Check admin permissions or RLS policies.');
+      }
+
+      const { data: itemRows, error: itemsError } = await db
         .from('order_items')
         .select('order_id, product_id, product_name, quantity, price, customization')
         .eq('order_id', id);

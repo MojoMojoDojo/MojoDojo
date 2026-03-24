@@ -110,7 +110,7 @@ export const en = {
           name: 'Michael Haddad',
           nickname: 'FatMike',
           role: 'Software Developer',
-          bio: "Building the digital infrastructure that powers MojoDojo's operations and customer experience.",
+          bio: 'Built this website with love ❤️',
         },
       ],
     },
