@@ -25,20 +25,27 @@ const PAYMENT_STATUS_OPTIONS: NonNullable<Order['payment_status']>[] = ['pending
 const PAYMENT_STATUS_LABELS: Record<NonNullable<Order['payment_status']>, string> = {
   pending: 'Pending',
   paid: 'Paid',
+  arranged: 'Arranged',
 };
 
-const FULFILLMENT_STATUS_OPTIONS: NonNullable<Order['fulfillment_status']>[] = [
+type SelectableFulfillmentStatus = 'not_started' | 'in_progress' | 'fulfilled';
+
+const FULFILLMENT_STATUS_OPTIONS: SelectableFulfillmentStatus[] = [
   'not_started',
   'in_progress',
-  'ready',
   'fulfilled',
 ];
-const FULFILLMENT_STATUS_LABELS: Record<NonNullable<Order['fulfillment_status']>, string> = {
+const FULFILLMENT_STATUS_LABELS: Record<SelectableFulfillmentStatus, string> = {
   not_started: 'Not started',
   in_progress: 'In progress',
-  ready: 'Ready',
-  fulfilled: 'Fulfilled',
+  fulfilled: 'Completed',
 };
+
+function normalizeFulfillmentStatus(status?: Order['fulfillment_status']): SelectableFulfillmentStatus {
+  if (status === 'fulfilled') return 'fulfilled';
+  if (status === 'in_progress' || status === 'ready') return 'in_progress';
+  return 'not_started';
+}
 
 export function OrdersManagement() {
   const { accessToken, user } = useAuth();
@@ -47,7 +54,7 @@ export function OrdersManagement() {
   const [statusFilter, setStatusFilter] = useState<MainOrderStatus>('all');
   const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'pickup' | 'delivery'>('all');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'pending' | 'paid'>('all');
-  const [fulfillmentFilter, setFulfillmentFilter] = useState<'all' | NonNullable<Order['fulfillment_status']>>('all');
+  const [fulfillmentFilter, setFulfillmentFilter] = useState<'all' | SelectableFulfillmentStatus>('all');
   const [dateSortMode, setDateSortMode] = useState<'none' | 'asc' | 'desc'>('none');
   const [totalSortMode, setTotalSortMode] = useState<'none' | 'asc' | 'desc'>('none');
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
@@ -140,7 +147,7 @@ export function OrdersManagement() {
       {
         status: 'accepted',
         payment_status: order.payment_status ?? 'pending',
-        fulfillment_status: order.fulfillment_status ?? 'not_started',
+        fulfillment_status: 'in_progress',
       },
       'Order accepted',
     );
@@ -169,7 +176,7 @@ export function OrdersManagement() {
       return false;
     }
 
-    const resolvedFulfillment = order.fulfillment_status ?? 'not_started';
+    const resolvedFulfillment = normalizeFulfillmentStatus(order.fulfillment_status);
     if (fulfillmentFilter !== 'all' && resolvedFulfillment !== fulfillmentFilter) {
       return false;
     }
@@ -311,7 +318,7 @@ export function OrdersManagement() {
 
           <Select
             value={fulfillmentFilter}
-            onValueChange={(value) => setFulfillmentFilter(value as 'all' | NonNullable<Order['fulfillment_status']>)}
+            onValueChange={(value) => setFulfillmentFilter(value as 'all' | SelectableFulfillmentStatus)}
           >
             <SelectTrigger className="w-full border-brand-dark-gray bg-brand-dark-gray text-brand-off-white">
               <SelectValue placeholder="Fulfillment" />
@@ -439,7 +446,7 @@ export function OrdersManagement() {
                         </p>
                         <p>
                           <span className="text-brand-light-gray">Fulfillment:</span>{' '}
-                          {FULFILLMENT_STATUS_LABELS[order.fulfillment_status ?? 'not_started']}
+                          {FULFILLMENT_STATUS_LABELS[normalizeFulfillmentStatus(order.fulfillment_status)]}
                         </p>
                       </div>
                     </div>
@@ -510,7 +517,7 @@ export function OrdersManagement() {
                     </Select>
 
                     <Select
-                      value={order.fulfillment_status ?? 'not_started'}
+                      value={normalizeFulfillmentStatus(order.fulfillment_status)}
                       onValueChange={(value) =>
                         updateOrder(order.id, { fulfillment_status: value as Order['fulfillment_status'] }, 'Fulfillment status updated')
                       }
