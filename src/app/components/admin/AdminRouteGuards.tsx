@@ -152,3 +152,4 @@ export function RedirectAuthenticatedAdminEntry() {
 
   return <Navigate to="/admin/dashboard/orders" replace />;
 }
+

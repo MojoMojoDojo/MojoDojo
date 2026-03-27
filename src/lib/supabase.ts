@@ -56,6 +56,8 @@ export interface Order {
   payment_method?: 'cash' | 'etranser' | 'arranged_after_approval' | 'online';
   payment_status?: 'pending' | 'paid' | 'arranged';
   fulfillment_status?: 'not_started' | 'in_progress' | 'ready' | 'fulfilled';
+  fulfilled_at?: string;
+  inventory_applied_at?: string;
   delivery_type: 'pickup' | 'delivery';
   delivery_address?: string;
   preferred_datetime?: string;

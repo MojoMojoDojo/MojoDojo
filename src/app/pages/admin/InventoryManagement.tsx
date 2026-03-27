@@ -8,12 +8,26 @@ import { toast } from 'sonner';
 import { AlertTriangle, Package2 } from 'lucide-react';
 import { canManageSensitiveBusinessData } from '../../lib/accessControl';
 
+type Movement = {
+  id: number;
+  ingredient_id: string;
+  ingredient_name: string;
+  unit: string;
+  quantity_delta: number;
+  movement_type: 'manual_adjustment' | 'order_fulfillment';
+  reason?: string | null;
+  order_id?: string | null;
+  created_at: string;
+};
+
 export function InventoryManagement() {
   const { accessToken, user } = useAuth();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(true);
   const [stockDrafts, setStockDrafts] = useState<Record<string, string>>({});
+  const [reasonDrafts, setReasonDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [movements, setMovements] = useState<Movement[]>([]);
 
   const canManage = canManageSensitiveBusinessData(user?.role);
 
@@ -25,8 +39,12 @@ export function InventoryManagement() {
     if (!accessToken) return;
 
     try {
-      const { ingredients: data } = await api.ingredients.getAll(accessToken);
+      const [{ ingredients: data }, { movements: movementRows }] = await Promise.all([
+        api.ingredients.getAll(accessToken),
+        api.ingredients.getMovements(accessToken),
+      ]);
       setIngredients(data);
+      setMovements(movementRows);
       setStockDrafts(
         data.reduce<Record<string, string>>((acc, item) => {
           acc[item.id] = String(item.stock_quantity);
@@ -35,7 +53,8 @@ export function InventoryManagement() {
       );
     } catch (error) {
       console.error('Failed to load ingredients:', error);
-      toast.error('Failed to load ingredients');
+      const message = error instanceof Error ? error.message : 'Failed to load ingredients';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -50,15 +69,27 @@ export function InventoryManagement() {
 
     try {
       setSavingId(id);
-      await api.ingredients.update(id, { stock_quantity: newQuantity }, accessToken);
+      await api.ingredients.update(
+        id,
+        { stock_quantity: newQuantity },
+        accessToken,
+        reasonDrafts[id]?.trim() || 'Manual inventory adjustment from inventory page',
+      );
       toast.success('Stock updated');
       await loadIngredients();
     } catch (error) {
       console.error('Failed to update stock:', error);
-      toast.error('Failed to update stock');
+      const message = error instanceof Error ? error.message : 'Failed to update stock';
+      toast.error(message);
     } finally {
       setSavingId(null);
     }
+  }
+
+  function formatMovementDate(value: string) {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString();
   }
 
   const lowStockItems = ingredients.filter(i => i.stock_quantity <= i.threshold_alert);
@@ -157,6 +188,18 @@ export function InventoryManagement() {
                         }
                         className="w-40 bg-brand-black border-brand-dark-gray"
                       />
+                      <Input
+                        type="text"
+                        placeholder="Reason (optional)"
+                        value={reasonDrafts[ingredient.id] ?? ''}
+                        onChange={(event) =>
+                          setReasonDrafts((current) => ({
+                            ...current,
+                            [ingredient.id]: event.target.value,
+                          }))
+                        }
+                        className="min-w-56 bg-brand-black border-brand-dark-gray"
+                      />
                       <Button
                         type="button"
                         className="btn-primary-gold"
@@ -177,6 +220,37 @@ export function InventoryManagement() {
                 </div>
               );
             })}
+
+            <div className="mt-6 rounded-lg border border-brand-dark-gray bg-brand-charcoal p-4">
+              <h3 className="text-lg font-semibold">Recent Inventory Movements</h3>
+              {movements.length === 0 ? (
+                <p className="mt-2 text-sm text-brand-light-gray">No movement history yet.</p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {movements.map((movement) => (
+                    <div
+                      key={movement.id}
+                      className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-brand-dark-gray bg-brand-black/50 px-3 py-2 text-sm"
+                    >
+                      <div>
+                        <p className="font-medium text-brand-off-white">
+                          {movement.ingredient_name}{' '}
+                          <span className={movement.quantity_delta < 0 ? 'text-red-300' : 'text-green-300'}>
+                            {movement.quantity_delta < 0 ? '' : '+'}{movement.quantity_delta} {movement.unit}
+                          </span>
+                        </p>
+                        <p className="text-xs text-brand-light-gray">
+                          {movement.movement_type === 'order_fulfillment' ? 'Completed order' : 'Manual adjustment'}
+                          {movement.order_id ? ` • Order ${movement.order_id}` : ''}
+                          {movement.reason ? ` • ${movement.reason}` : ''}
+                        </p>
+                      </div>
+                      <p className="text-xs text-brand-light-gray">{formatMovementDate(movement.created_at)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

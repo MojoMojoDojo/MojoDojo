@@ -35,6 +35,21 @@ export function UserManagement() {
     loadUsers();
   }, [accessToken]);
 
+  function toFriendlyError(error: unknown): string {
+    if (!(error instanceof Error)) return 'Unexpected error. Please try again.';
+    const message = error.message || 'Unexpected error. Please try again.';
+    if (/already|exists|registered/i.test(message)) {
+      return 'A user with this email already exists.';
+    }
+    if (/unauthorized|forbidden|only admins/i.test(message)) {
+      return 'Your session does not have permission for this action. Please sign in again as admin.';
+    }
+    if (/password/i.test(message)) {
+      return 'Password does not meet requirements. Use at least 8 characters.';
+    }
+    return message;
+  }
+
   async function loadUsers() {
     if (!accessToken) {
       setLoading(false);
@@ -46,8 +61,7 @@ export function UserManagement() {
       setUsers(data);
     } catch (error) {
       console.error('Failed to load users:', error);
-      const message = error instanceof Error ? error.message : 'Failed to load users';
-      toast.error(message);
+      toast.error(`Failed to load users: ${toFriendlyError(error)}`);
     } finally {
       setLoading(false);
     }
@@ -83,8 +97,7 @@ export function UserManagement() {
       await loadUsers();
     } catch (error) {
       console.error('Failed to create user:', error);
-      const message = error instanceof Error ? error.message : 'Failed to create user';
-      toast.error(message);
+      toast.error(`Failed to create user: ${toFriendlyError(error)}`);
     } finally {
       setSubmitting(false);
     }

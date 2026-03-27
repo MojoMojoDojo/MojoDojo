@@ -1,6 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
 import type { Product, Order, Ingredient, GalleryItem } from './supabase';
-import { supabase, supabaseAnonKey, supabaseFunctionAnonKey, supabaseUrl } from './supabase';
+import { supabase, supabaseFunctionAnonKey, supabaseUrl } from './supabase';
 
 const API_BASE = `${supabaseUrl}/functions/v1/make-server-44229999`;
 
@@ -9,6 +8,18 @@ interface ApiOptions {
   body?: any;
   token?: string;
 }
+
+type InventoryMovement = {
+  id: number;
+  ingredient_id: string;
+  ingredient_name: string;
+  unit: string;
+  quantity_delta: number;
+  movement_type: 'manual_adjustment' | 'order_fulfillment';
+  reason?: string | null;
+  order_id?: string | null;
+  created_at: string;
+};
 
 type OrderCreatePayload = Partial<Order> & {
   fulfillment_type?: 'pickup' | 'delivery';
@@ -34,6 +45,8 @@ type OrderRow = {
   payment_method?: Order['payment_method'];
   payment_status?: Order['payment_status'];
   fulfillment_status?: Order['fulfillment_status'];
+  fulfilled_at?: string | null;
+  inventory_applied_at?: string | null;
   delivery_type: Order['delivery_type'];
   delivery_address?: string | null;
   preferred_datetime?: string | null;
@@ -177,6 +190,8 @@ function mapOrderRowsToOrders(orderRows: OrderRow[], itemRows: OrderItemRow[]): 
       payment_method: row.payment_method,
       payment_status: row.payment_status,
       fulfillment_status: row.fulfillment_status,
+      fulfilled_at: row.fulfilled_at ?? undefined,
+      inventory_applied_at: row.inventory_applied_at ?? undefined,
       delivery_type: row.delivery_type,
       delivery_address: row.delivery_address ?? undefined,
       preferred_datetime: row.preferred_datetime ?? undefined,
@@ -196,26 +211,71 @@ function mapOrderRowsToOrders(orderRows: OrderRow[], itemRows: OrderItemRow[]): 
 }
 
 async function apiCall(endpoint: string, options: ApiOptions = {}) {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${options.token || supabaseFunctionAnonKey}`,
-  };
+  async function requestWithToken(tokenOverride?: string) {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${tokenOverride || options.token || supabaseFunctionAnonKey}`,
+    };
 
-  const config: RequestInit = {
-    method: options.method || 'GET',
-    headers,
-  };
+    const config: RequestInit = {
+      method: options.method || 'GET',
+      headers,
+    };
 
-  if (options.body) {
-    config.body = JSON.stringify(options.body);
+    if (options.body) {
+      config.body = JSON.stringify(options.body);
+    }
+
+    const response = await fetch(`${API_BASE}${endpoint}`, config);
+
+    const raw = await response.text();
+    let data: any = {};
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      data = { raw };
+    }
+
+    return { response, data };
   }
 
   try {
-    const response = await fetch(`${API_BASE}${endpoint}`, config);
-    const data = await response.json();
+    let { response, data } = await requestWithToken();
 
     if (!response.ok) {
-      throw new Error(data.error || 'API request failed');
+      const firstDetails = typeof data.error === 'string'
+        ? data.error
+        : typeof data.message === 'string'
+          ? data.message
+          : typeof data.raw === 'string' && data.raw.trim().length > 0
+            ? data.raw
+            : `Request failed with status ${response.status}`;
+
+      if (options.token && /invalid jwt/i.test(firstDetails)) {
+        const { data: refreshedSession, error: refreshError } = await supabase.auth.refreshSession();
+        const refreshedToken = refreshedSession?.session?.access_token;
+
+        if (refreshError && import.meta.env.DEV) {
+          console.warn('Session refresh failed after invalid JWT:', refreshError.message);
+        }
+
+        if (refreshedToken) {
+          const retried = await requestWithToken(refreshedToken);
+          response = retried.response;
+          data = retried.data;
+        }
+      }
+    }
+
+    if (!response.ok) {
+      const details = typeof data.error === 'string'
+        ? data.error
+        : typeof data.message === 'string'
+          ? data.message
+          : typeof data.raw === 'string' && data.raw.trim().length > 0
+            ? data.raw
+            : `Request failed with status ${response.status}`;
+      throw new Error(details);
     }
 
     return data;
@@ -225,18 +285,9 @@ async function apiCall(endpoint: string, options: ApiOptions = {}) {
   }
 }
 
-function getSupabaseForToken(token?: string) {
-  if (!token) {
-    return supabase;
-  }
-
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    },
-  });
+async function getLatestAccessToken(fallbackToken?: string) {
+  const { data } = await supabase.auth.getSession();
+  return data?.session?.access_token ?? fallbackToken ?? '';
 }
 
 export const api = {
@@ -256,34 +307,69 @@ export const api = {
     async getAll(token: string): Promise<{
       users: Array<{ id: string; email: string; full_name?: string; role: 'admin' | 'worker'; created_at?: string }>;
     }> {
-      const db = getSupabaseForToken(token);
+      const latestToken = await getLatestAccessToken(token);
 
-      const { data, error } = await db
-        .from('profiles')
-        .select('id, email, full_name, role, created_at')
-        .order('created_at', { ascending: false });
+      try {
+        const response = await apiCall('/admin/users', { token: latestToken });
+        const rows = Array.isArray(response?.users) ? response.users : [];
 
-      if (error) {
-        throw new Error(error.message || 'Failed to fetch users. Check profiles select policy for admin users.');
+        return {
+          users: rows.map((row: Record<string, unknown>) => ({
+            id: String(row.id ?? ''),
+            email: String(row.email ?? ''),
+            full_name: row.full_name ? String(row.full_name) : undefined,
+            role: row.role === 'admin' ? 'admin' : 'worker',
+            created_at: row.created_at ? String(row.created_at) : undefined,
+          })),
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        if (!/invalid jwt|unauthorized|forbidden/i.test(message)) {
+          throw error;
+        }
+
+        const { data, error: queryError } = await supabase
+          .from('profiles')
+          .select('id, email, full_name, role, created_at')
+          .order('created_at', { ascending: false });
+
+        if (queryError) {
+          throw new Error(`Failed to fetch users: ${queryError.message}`);
+        }
+
+        return {
+          users: (data ?? []).map((row) => ({
+            id: String(row.id ?? ''),
+            email: String(row.email ?? ''),
+            full_name: row.full_name ? String(row.full_name) : undefined,
+            role: row.role === 'admin' ? 'admin' : 'worker',
+            created_at: row.created_at ? String(row.created_at) : undefined,
+          })),
+        };
       }
-
-      const users = (data ?? []).map((row) => ({
-        id: String(row.id ?? ''),
-        email: String(row.email ?? ''),
-        full_name: row.full_name ? String(row.full_name) : undefined,
-        role: (row.role === 'admin' ? 'admin' : 'worker') as 'admin' | 'worker',
-        created_at: row.created_at ? String(row.created_at) : undefined,
-      }));
-
-      return { users };
     },
 
     async create(payload: { email: string; password: string; name?: string; role: 'admin' | 'worker' }, token: string) {
-      return apiCall('/auth/signup', {
-        method: 'POST',
-        body: payload,
-        token,
-      });
+      const latestToken = await getLatestAccessToken(token);
+
+      try {
+        return await apiCall('/admin/users', {
+          method: 'POST',
+          body: payload,
+          token: latestToken,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        if (!/not found|404|invalid jwt|unauthorized/i.test(message)) {
+          throw error;
+        }
+
+        return apiCall('/auth/signup', {
+          method: 'POST',
+          body: payload,
+          token: latestToken,
+        });
+      }
     },
   },
 
@@ -308,8 +394,8 @@ export const api = {
 
   // Orders
   orders: {
-    async getAll(token?: string): Promise<{ orders: Order[] }> {
-      const db = getSupabaseForToken(token);
+    async getAll(_token?: string): Promise<{ orders: Order[] }> {
+      const db = supabase;
 
       let orderRows: any[] | null = null;
       let ordersError: { message?: string } | null = null;
@@ -429,12 +515,14 @@ export const api = {
         throw new Error(orderInsertError?.message || 'Failed to save order');
       }
 
+      const insertedOrderId = String(insertedOrder.id ?? generatedOrderId);
+
       const orderItems = Array.isArray(order.items) ? order.items : [];
       if (orderItems.length > 0) {
         try {
-          await insertOrderItemsWithCompatibility(insertedOrder.id, orderItems);
+          await insertOrderItemsWithCompatibility(insertedOrderId, orderItems);
         } catch (itemsError) {
-          await supabase.from('orders').delete().eq('id', insertedOrder.id);
+          await supabase.from('orders').delete().eq('id', insertedOrderId);
           throw itemsError;
         }
       }
@@ -449,6 +537,8 @@ export const api = {
         payment_method: (insertedOrder.payment_method as Order['payment_method']) ?? order.payment_method,
         payment_status: (insertedOrder.payment_status as Order['payment_status']) ?? order.payment_status,
         fulfillment_status: (insertedOrder.fulfillment_status as Order['fulfillment_status']) ?? order.fulfillment_status,
+        fulfilled_at: (insertedOrder.fulfilled_at as string | null | undefined) ?? undefined,
+        inventory_applied_at: (insertedOrder.inventory_applied_at as string | null | undefined) ?? undefined,
         delivery_type: (insertedOrder.delivery_type as Order['delivery_type']) ?? (order.delivery_type as Order['delivery_type']) ?? 'pickup',
         delivery_address: (insertedOrder.delivery_address as string | null | undefined) ?? undefined,
         preferred_datetime: (insertedOrder.preferred_datetime as string | null | undefined) ?? undefined,
@@ -463,7 +553,7 @@ export const api = {
     },
 
     async update(id: string, updates: Partial<Order>, token: string) {
-      const db = getSupabaseForToken(token);
+      const db = supabase;
 
       const status = updates.status;
       if (status && !['request_received', 'under_review', 'accepted', 'rejected'].includes(status)) {
@@ -602,7 +692,26 @@ export const api = {
       return apiCall('/ingredients', { token });
     },
 
-    async update(id: string, updates: Partial<Ingredient>, token: string) {
+    async update(id: string, updates: Partial<Ingredient>, token: string, reason?: string) {
+      if (Object.prototype.hasOwnProperty.call(updates, 'stock_quantity')) {
+        const newQuantity = Number(updates.stock_quantity);
+        if (!Number.isFinite(newQuantity) || newQuantity < 0) {
+          throw new Error('Stock quantity must be a non-negative number');
+        }
+
+        const movementReason = reason?.trim() || 'Manual inventory adjustment from admin panel';
+
+        const movementResponse = await supabase.rpc('admin_set_inventory_quantity', {
+          p_item_id: id,
+          p_new_quantity: newQuantity,
+          p_reason: movementReason,
+        });
+
+        if (!movementResponse.error) {
+          return { success: true };
+        }
+      }
+
       const inventoryUpdate = await supabase
         .from('inventory_items')
         .update(updates)
@@ -630,7 +739,34 @@ export const api = {
         body: updates,
         token
       });
-    }
+    },
+
+    async getMovements(_token: string): Promise<{ movements: InventoryMovement[] }> {
+      const db = supabase;
+      const { data, error } = await db
+        .from('inventory_movements')
+        .select('id, ingredient_id, ingredient_name, unit, quantity_delta, movement_type, reason, order_id, created_at')
+        .order('created_at', { ascending: false })
+        .limit(30);
+
+      if (error) {
+        throw new Error(error.message || 'Failed to load inventory movements');
+      }
+
+      const movements: InventoryMovement[] = ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
+        id: Number(row.id ?? 0),
+        ingredient_id: String(row.ingredient_id ?? ''),
+        ingredient_name: String(row.ingredient_name ?? ''),
+        unit: String(row.unit ?? ''),
+        quantity_delta: Number(row.quantity_delta ?? 0),
+        movement_type: row.movement_type === 'manual_adjustment' ? 'manual_adjustment' : 'order_fulfillment',
+        reason: row.reason ? String(row.reason) : null,
+        order_id: row.order_id ? String(row.order_id) : null,
+        created_at: String(row.created_at ?? ''),
+      }));
+
+      return { movements };
+    },
   },
 
   // Gallery

@@ -35,16 +35,71 @@ function getStartOfDay(date: Date) {
   return copy;
 }
 
-function getWeekLabelInMonth(date: Date) {
-  const day = date.getDate();
-  const week = Math.ceil(day / 7);
-  return `W${week}`;
+function toIsoDay(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getWeekOfYear(date: Date) {
+  const jan1 = new Date(date.getFullYear(), 0, 1);
+  const dayOffset = Math.floor((date.getTime() - jan1.getTime()) / 86400000);
+  const week = Math.ceil((dayOffset + jan1.getDay() + 1) / 7);
+  return Math.min(Math.max(week, 1), 53);
+}
+
+function inferQuickAddSkuId(item: Order['items'][number]): string | null {
+  const productName = String(item.product_name ?? '').toLowerCase();
+  const quantity = Number(item.quantity ?? 0);
+  const hasAlcohol = !!(
+    item.customization?.alcoholChoiceId
+    || item.customization?.pureAlcoholMl
+    || item.customization?.estimatedFinalAbvPercent
+  );
+
+  if (productName.includes('biscoff')) return 'biscoff_cheesecake';
+  if (productName.includes('brownie')) return 'cheesecake_brownie_tray';
+
+  if (productName.includes('tiramisu')) {
+    if (hasAlcohol || productName.includes('marsala') || productName.includes('alcohol')) {
+      return quantity >= 2 ? 'tiramisu_large_alcohol' : 'tiramisu_small_alcohol';
+    }
+    return quantity >= 2 ? 'tiramisu_large' : 'tiramisu_small';
+  }
+
+  return null;
+}
+
+function isDateInCurrentTimeframe(date: Date, timeframe: Timeframe, now: Date): boolean {
+  if (timeframe === 'day') {
+    return toIsoDay(date) === toIsoDay(now);
+  }
+
+  if (timeframe === 'last_7_days') {
+    const start = getStartOfDay(new Date(now));
+    start.setDate(start.getDate() - 6);
+    return date >= start;
+  }
+
+  if (timeframe === 'month') {
+    return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+  }
+
+  if (timeframe === 'year') {
+    return date.getFullYear() === now.getFullYear();
+  }
+
+  return true;
 }
 
 export function FinancialOverview() {
   const { accessToken } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [ingredientCosts, setIngredientCosts] = useState<Record<string, number>>({});
+  const [movements, setMovements] = useState<Array<{
+    ingredient_id: string;
+    quantity_delta: number;
+    movement_type: 'manual_adjustment' | 'order_fulfillment';
+    created_at: string;
+  }>>([]);
   const [timeframe, setTimeframe] = useState<Timeframe>('last_7_days');
   const [selectedPeriodKey, setSelectedPeriodKey] = useState<string | null>(null);
   const [quickAddCounts, setQuickAddCounts] = useState<Record<string, number>>({});
@@ -58,21 +113,39 @@ export function FinancialOverview() {
     if (!accessToken) return;
 
     try {
-      const { orders: data } = await api.orders.getAll(accessToken);
+      const [{ orders: data }, { ingredients }, { movements: movementRows }] = await Promise.all([
+        api.orders.getAll(accessToken),
+        api.ingredients.getAll(accessToken),
+        api.ingredients.getMovements(accessToken),
+      ]);
       setOrders(data);
+      setIngredientCosts(
+        ingredients.reduce<Record<string, number>>((acc, item) => {
+          acc[item.id] = Number(item.cost_per_unit ?? 0);
+          return acc;
+        }, {}),
+      );
+      setMovements(
+        movementRows.map((row) => ({
+          ingredient_id: row.ingredient_id,
+          quantity_delta: row.quantity_delta,
+          movement_type: row.movement_type,
+          created_at: row.created_at,
+        })),
+      );
     } catch (error) {
       console.error('Failed to load orders:', error);
-    } finally {
-      setLoading(false);
     }
   }
 
   const acceptedPaidOrders = orders.filter(
-    (order) => toMainOrderStatus(order.status) === 'accepted' && (order.payment_status ?? 'pending') === 'paid',
+    (order) =>
+      toMainOrderStatus(order.status) === 'accepted'
+      && (order.payment_status ?? 'pending') === 'paid',
   );
 
   function getFinancialOrderDate(order: Order): Date | null {
-    const parsed = new Date(order.preferred_datetime ?? order.created_at);
+    const parsed = new Date(order.fulfilled_at ?? order.preferred_datetime ?? order.created_at);
     if (Number.isNaN(parsed.getTime())) return null;
     return parsed;
   }
@@ -101,8 +174,8 @@ export function FinancialOverview() {
     if (!orderDate) continue;
 
     if (timeframe === 'day') {
-      const dayKey = now.toISOString().slice(0, 10);
-      if (orderDate.toISOString().slice(0, 10) !== dayKey) continue;
+      const dayKey = toIsoDay(now);
+      if (toIsoDay(orderDate) !== dayKey) continue;
       addPoint(dayKey, 'Today', order);
       continue;
     }
@@ -112,23 +185,23 @@ export function FinancialOverview() {
       start.setDate(start.getDate() - 6);
       if (orderDate < start) continue;
 
-      const dayKey = orderDate.toISOString().slice(0, 10);
+      const dayKey = toIsoDay(orderDate);
       addPoint(dayKey, orderDate.toLocaleDateString('en-US', { weekday: 'short' }), order);
       continue;
     }
 
     if (timeframe === 'month') {
       if (orderDate.getFullYear() !== now.getFullYear() || orderDate.getMonth() !== now.getMonth()) continue;
-      const weekLabel = getWeekLabelInMonth(orderDate);
-      addPoint(weekLabel, weekLabel, order);
+      const dayKey = toIsoDay(orderDate);
+      addPoint(dayKey, orderDate.getDate().toString(), order);
       continue;
     }
 
     if (timeframe === 'year') {
       if (orderDate.getFullYear() !== now.getFullYear()) continue;
-      const monthKey = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}`;
-      const monthName = orderDate.toLocaleDateString('en-US', { month: 'short' });
-      addPoint(monthKey, monthName, order);
+      const weekNum = getWeekOfYear(orderDate);
+      const weekKey = `week-${weekNum}`;
+      addPoint(weekKey, `W${weekNum}`, order);
       continue;
     }
 
@@ -137,52 +210,130 @@ export function FinancialOverview() {
   }
 
   let chartData = Array.from(chartMap.values());
+
   if (timeframe === 'last_7_days') {
-    chartData = chartData.sort((a, b) => a.key.localeCompare(b.key));
+    // Always render exactly 7 day bars for predictable analytics UX.
+    const sevenDayBars: ChartPoint[] = [];
+    for (let offset = 6; offset >= 0; offset -= 1) {
+      const day = new Date(now);
+      day.setHours(0, 0, 0, 0);
+      day.setDate(day.getDate() - offset);
+      const key = toIsoDay(day);
+      const existing = chartMap.get(key);
+      sevenDayBars.push({
+        key,
+        name: day.toLocaleDateString('en-US', { weekday: 'short' }),
+        revenue: existing?.revenue ?? 0,
+        orders: existing?.orders ?? 0,
+      });
+    }
+    chartData = sevenDayBars;
+  } else if (timeframe === 'day') {
+    const todayKey = toIsoDay(now);
+    const existing = chartMap.get(todayKey);
+    chartData = [{
+      key: todayKey,
+      name: 'Today',
+      revenue: existing?.revenue ?? 0,
+      orders: existing?.orders ?? 0,
+    }];
   } else if (timeframe === 'month') {
-    chartData = chartData.sort((a, b) => a.key.localeCompare(b.key));
+    // Health-app style: always show all 30 days of the month, even with 0 revenue.
+    const monthBars: ChartPoint[] = [];
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = new Date(now.getFullYear(), now.getMonth(), day);
+      const key = toIsoDay(date);
+      const existing = chartMap.get(key);
+      monthBars.push({
+        key,
+        name: day.toString(),
+        revenue: existing?.revenue ?? 0,
+        orders: existing?.orders ?? 0,
+      });
+    }
+    chartData = monthBars;
   } else if (timeframe === 'year') {
-    chartData = chartData.sort((a, b) => a.key.localeCompare(b.key));
+    // Health-app style: always show all weeks of the year, even with 0 revenue.
+    const yearBars: ChartPoint[] = [];
+    for (let week = 1; week <= 53; week += 1) {
+      const key = `week-${week}`;
+      const existing = chartMap.get(key);
+      yearBars.push({
+        key,
+        name: `W${week}`,
+        revenue: existing?.revenue ?? 0,
+        orders: existing?.orders ?? 0,
+      });
+    }
+    chartData = yearBars;
   } else {
     chartData = chartData.sort((a, b) => a.key.localeCompare(b.key));
   }
 
-  const selectedKey = selectedPeriodKey ?? chartData[0]?.key ?? null;
+  const selectedKey = selectedPeriodKey;
   const selectedOrders = acceptedPaidOrders.filter((order) => {
-    if (!selectedKey) return false;
     const orderDate = getFinancialOrderDate(order);
     if (!orderDate) return false;
 
+    if (!selectedKey) {
+      return isDateInCurrentTimeframe(orderDate, timeframe, now);
+    }
+
     if (timeframe === 'day') {
-      return orderDate.toISOString().slice(0, 10) === selectedKey;
+      return toIsoDay(orderDate) === selectedKey;
     }
 
     if (timeframe === 'last_7_days') {
-      return orderDate.toISOString().slice(0, 10) === selectedKey;
+      return toIsoDay(orderDate) === selectedKey;
     }
 
     if (timeframe === 'month') {
-      return getWeekLabelInMonth(orderDate) === selectedKey
-        && orderDate.getFullYear() === now.getFullYear()
-        && orderDate.getMonth() === now.getMonth();
+      return toIsoDay(orderDate) === selectedKey;
     }
 
     if (timeframe === 'year') {
-      const monthKey = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}`;
-      return monthKey === selectedKey;
+      const weekNum = getWeekOfYear(orderDate);
+      return `week-${weekNum}` === selectedKey;
     }
 
     return String(orderDate.getFullYear()) === selectedKey;
   });
 
+  const selectedExpenseMovements = movements.filter((movement) => {
+    if (movement.movement_type !== 'order_fulfillment') return false;
+
+    const movementDate = new Date(movement.created_at);
+    if (Number.isNaN(movementDate.getTime())) return false;
+
+    if (!selectedKey) {
+      return isDateInCurrentTimeframe(movementDate, timeframe, now);
+    }
+
+    if (timeframe === 'day' || timeframe === 'last_7_days') {
+      return toIsoDay(movementDate) === selectedKey;
+    }
+
+    if (timeframe === 'month') {
+      return toIsoDay(movementDate) === selectedKey;
+    }
+
+    if (timeframe === 'year') {
+      const weekNum = getWeekOfYear(movementDate);
+      return `week-${weekNum}` === selectedKey;
+    }
+
+    return String(movementDate.getFullYear()) === selectedKey;
+  });
+
   const totalRevenue = selectedOrders.reduce((sum, order) => sum + order.total, 0);
-  const cashOrders = selectedOrders
-    .filter((order) => order.payment_method === 'cash')
-    .reduce((sum, order) => sum + order.total, 0);
-  const onlineOrders = selectedOrders
-    .filter((order) => order.payment_method === 'online' || order.payment_method === 'etranser')
-    .reduce((sum, order) => sum + order.total, 0);
   const averageOrder = selectedOrders.length > 0 ? totalRevenue / selectedOrders.length : 0;
+  const totalExpenses = selectedExpenseMovements.reduce((sum, movement) => {
+    const unitCost = Number(ingredientCosts[movement.ingredient_id] ?? 0);
+    const usedQuantity = Math.abs(Number(movement.quantity_delta ?? 0));
+    return sum + (unitCost * usedQuantity);
+  }, 0);
+  const grossProfit = totalRevenue - totalExpenses;
 
   const timeframeLabel =
     timeframe === 'day'
@@ -195,7 +346,31 @@ export function FinancialOverview() {
           ? 'This year'
           : 'All time';
 
-  const worksheet = useMemo(() => buildIngredientWorksheet(quickAddCounts), [quickAddCounts]);
+  const autoQuickAddCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+
+    for (const order of selectedOrders) {
+      if (order.fulfillment_status !== 'fulfilled') continue;
+
+      for (const item of order.items) {
+        const skuId = inferQuickAddSkuId(item);
+        if (!skuId) continue;
+        counts[skuId] = (counts[skuId] ?? 0) + Number(item.quantity ?? 0);
+      }
+    }
+
+    return counts;
+  }, [selectedOrders]);
+
+  const combinedQuickAddCounts = useMemo(() => {
+    const combined: Record<string, number> = { ...autoQuickAddCounts };
+    for (const [skuId, count] of Object.entries(quickAddCounts)) {
+      combined[skuId] = (combined[skuId] ?? 0) + count;
+    }
+    return combined;
+  }, [autoQuickAddCounts, quickAddCounts]);
+
+  const worksheet = useMemo(() => buildIngredientWorksheet(combinedQuickAddCounts), [combinedQuickAddCounts]);
 
   function incrementSku(skuId: string, amount: number) {
     setQuickAddCounts((current) => {
@@ -254,26 +429,26 @@ export function FinancialOverview() {
 
         <div className="premium-card p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-brand-light-gray text-sm">Cash Payments</h3>
-            <DollarSign className="w-8 h-8 text-green-500" />
-          </div>
-          <p className="text-3xl font-bold">{formatCurrency(cashOrders)}</p>
-        </div>
-
-        <div className="premium-card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-brand-light-gray text-sm">Online Payments</h3>
-            <CreditCard className="w-8 h-8 text-blue-500" />
-          </div>
-          <p className="text-3xl font-bold">{formatCurrency(onlineOrders)}</p>
-        </div>
-
-        <div className="premium-card p-6">
-          <div className="flex items-center justify-between mb-4">
             <h3 className="text-brand-light-gray text-sm">Average Order</h3>
             <TrendingUp className="w-8 h-8 text-brand-gold" />
           </div>
           <p className="text-3xl font-bold">{formatCurrency(averageOrder)}</p>
+        </div>
+
+        <div className="premium-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-brand-light-gray text-sm">Expenses</h3>
+            <CreditCard className="w-8 h-8 text-red-300" />
+          </div>
+          <p className="text-3xl font-bold">{formatCurrency(totalExpenses)}</p>
+        </div>
+
+        <div className="premium-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-brand-light-gray text-sm">Profit</h3>
+            <TrendingUp className="w-8 h-8 text-green-500" />
+          </div>
+          <p className="text-3xl font-bold">{formatCurrency(grossProfit)}</p>
         </div>
       </div>
 
@@ -378,7 +553,7 @@ export function FinancialOverview() {
                     <p className="font-semibold">{sku.label}</p>
                     <p className="text-xs text-brand-light-gray">Revenue/unit: ${sku.revenuePerUnit.toFixed(2)}</p>
                   </div>
-                  <p className="text-lg font-bold gold-accent">{quickAddCounts[sku.id] ?? 0}</p>
+                  <p className="text-lg font-bold gold-accent">{combinedQuickAddCounts[sku.id] ?? 0}</p>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -434,7 +609,7 @@ export function FinancialOverview() {
           <div className="mb-6">
             <h2 className="text-2xl font-semibold golden-line pl-4">Ingredient Worksheet</h2>
             <p className="text-sm text-brand-light-gray mt-2">
-              Live estimate from quick-add quantities. Replace with real recipe/cost tables when backend is connected.
+              Auto-calculated from fulfilled orders in the selected period, plus any manual quick-add adjustments.
             </p>
           </div>
 

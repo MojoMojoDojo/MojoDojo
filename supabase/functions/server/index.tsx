@@ -13,6 +13,52 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
 );
 
+function getBearerToken(c: any): string | null {
+  const authHeader = c.req.header('Authorization') ?? '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  return token || null;
+}
+
+async function requireAdmin(c: any) {
+  const accessToken = getBearerToken(c);
+  if (!accessToken) {
+    return { ok: false, response: c.json({ error: 'Missing authorization token' }, 401) };
+  }
+
+  const { data: requesterData, error: requesterError } = await supabase.auth.getUser(accessToken);
+  if (requesterError || !requesterData?.user) {
+    return { ok: false, response: c.json({ error: 'Unauthorized request token' }, 401) };
+  }
+
+  const { data: requesterProfile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', requesterData.user.id)
+    .maybeSingle();
+
+  const requesterRole = requesterProfile?.role
+    ?? requesterData.user.app_metadata?.role
+    ?? requesterData.user.user_metadata?.role;
+
+  if (requesterRole !== 'admin') {
+    return { ok: false, response: c.json({ error: 'Only admins can perform this action' }, 403) };
+  }
+
+  return {
+    ok: true,
+    accessToken,
+    requester: requesterData.user,
+  };
+}
+
+function normalizeRole(value: unknown): 'admin' | 'worker' {
+  return value === 'admin' ? 'admin' : 'worker';
+}
+
+function cleanEmail(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
 // Enable logger
 app.use('*', logger(console.log));
 
@@ -165,6 +211,147 @@ app.post("/make-server-44229999/init", async (c) => {
 });
 
 // AUTH ROUTES
+
+app.get('/make-server-44229999/admin/users', async (c) => {
+  try {
+    const auth = await requireAdmin(c);
+    if (!auth.ok) {
+      return auth.response;
+    }
+
+    const { data: authUsersData, error: authUsersError } = await supabase.auth.admin.listUsers();
+    if (authUsersError) {
+      console.error('List users error:', authUsersError);
+      return c.json({ error: `Failed to list auth users: ${authUsersError.message}` }, 500);
+    }
+
+    const authUsers = authUsersData?.users ?? [];
+    const authUserIds = authUsers.map((user) => user.id);
+
+    const { data: profileRows, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, email, full_name, role, created_at')
+      .in('id', authUserIds.length > 0 ? authUserIds : ['00000000-0000-0000-0000-000000000000']);
+
+    if (profilesError) {
+      console.error('Profiles query error:', profilesError);
+      return c.json({ error: `Failed to load profile rows: ${profilesError.message}` }, 500);
+    }
+
+    const profileById = new Map((profileRows ?? []).map((row) => [row.id, row]));
+
+    const users = authUsers
+      .map((authUser) => {
+        const profile = profileById.get(authUser.id);
+        const email = cleanEmail(profile?.email ?? authUser.email);
+        const fullName = profile?.full_name
+          ?? authUser.user_metadata?.name
+          ?? authUser.user_metadata?.full_name
+          ?? null;
+        const role = normalizeRole(profile?.role ?? authUser.app_metadata?.role ?? authUser.user_metadata?.role);
+        const createdAt = profile?.created_at ?? authUser.created_at ?? null;
+
+        return {
+          id: authUser.id,
+          email,
+          full_name: fullName,
+          role,
+          created_at: createdAt,
+        };
+      })
+      .sort((a, b) => {
+        const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return bTime - aTime;
+      });
+
+    return c.json({ users, success: true });
+  } catch (error) {
+    console.error('Admin users list error:', error);
+    const message = error instanceof Error ? error.message : 'Unexpected error listing users';
+    return c.json({ error: message }, 500);
+  }
+});
+
+app.post('/make-server-44229999/admin/users', async (c) => {
+  try {
+    const auth = await requireAdmin(c);
+    if (!auth.ok) {
+      return auth.response;
+    }
+
+    const body = await c.req.json();
+    const email = cleanEmail(body?.email);
+    const password = String(body?.password ?? '').trim();
+    const name = String(body?.name ?? '').trim();
+    const role = normalizeRole(body?.role);
+
+    if (!email) {
+      return c.json({ error: 'Email is required' }, 400);
+    }
+    if (!password || password.length < 8) {
+      return c.json({ error: 'Password must be at least 8 characters' }, 400);
+    }
+
+    const { data, error } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        name: name || null,
+        role,
+      },
+      app_metadata: {
+        role,
+      },
+    });
+
+    if (error || !data?.user) {
+      const message = error?.message ?? 'Failed to create auth user';
+      const status = /already|exists|registered/i.test(message) ? 409 : 400;
+      return c.json({ error: message }, status);
+    }
+
+    const profilePayload = {
+      id: data.user.id,
+      email,
+      full_name: name || null,
+      role,
+    };
+
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert(profilePayload);
+
+    if (profileError) {
+      console.error('Profile upsert error after user creation:', profileError);
+      return c.json({ error: `User created but profile update failed: ${profileError.message}` }, 500);
+    }
+
+    await kv.set(`user:${data.user.id}`, {
+      id: data.user.id,
+      email,
+      name: name || null,
+      role,
+      created_at: new Date().toISOString(),
+    });
+
+    return c.json({
+      success: true,
+      user: {
+        id: data.user.id,
+        email,
+        full_name: name || null,
+        role,
+        created_at: data.user.created_at,
+      },
+    });
+  } catch (error) {
+    console.error('Admin user creation error:', error);
+    const message = error instanceof Error ? error.message : 'Unexpected error creating user';
+    return c.json({ error: message }, 500);
+  }
+});
 
 // Sign up new user
 app.post("/make-server-44229999/auth/signup", async (c) => {

@@ -122,8 +122,6 @@ function buildHourOptions(startHour24: number, endHour24: number) {
     const period = hour24 >= 12 ? 'PM' : 'AM';
     const nextPeriod = nextHour24 >= 12 ? 'PM' : 'AM';
     
-    // Use same period for both hours if they're in the same half-day
-    const singlePeriod = period === nextPeriod ? period : ` ${period} - ${nextHour12} ${nextPeriod}`;
     const label = period === nextPeriod 
       ? `${hour12}–${nextHour12} ${period}`
       : `${hour12} ${period} – ${nextHour12} ${nextPeriod}`;
