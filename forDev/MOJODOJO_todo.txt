@@ -1,0 +1,13 @@
+MOJODOJO todo
+
+- think about how to change the team. for pics remove SW dev (maybe make easter egg)
+- looks too corporate it needs to become more 
+- order button in the middle as soon as you open
+- as soon as you scroll down the best foods should show up to buy, forcing them to go to buy page
+- tiramisu should have a glow or something that makes it distinct of the others in the order page (mention its the thing that started it all)
+- FAQ in the main page
+- /admin -> add security if password wrong many times stop him
+- check zapier for auto sending message to confirm an order (better than email)
+	- other options to check: Make.com (Free) / MailerLite / Brevo (Free)
+- double check adding products from admin page to be added to the user page (+ ability to add a picture as well)
+- in financial, fix the all time option of graph (maybe make it show week by week like the year chart)
