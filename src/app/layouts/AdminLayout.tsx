@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { AdminSidebar } from '../components/AdminSidebar';
 import { Button } from '../components/ui/button';
 import { ChevronDown, LogOut, UserCircle2 } from 'lucide-react';
-import logoImage from '../../assets/MojoDojoLogo.png';
+import logoImage from '../../assets/MojoDojoLogoNoBackground.png';
 
 export function AdminLayout() {
   const { user, loading, signOut, authIssue } = useAuth();

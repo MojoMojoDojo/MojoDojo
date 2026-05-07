@@ -8,7 +8,7 @@ import {
   Users
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import logoImage from '../../assets/MojoDojoLogo.png';
+import logoImage from '../../assets/MojoDojoLogoNoBackground.png';
 import {
   canAccessAdminSection,
   type AdminSection,

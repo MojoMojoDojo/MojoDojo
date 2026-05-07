@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { Target, Heart, Award, Users } from 'lucide-react';
-import logoImage from '../../assets/MojoDojoLogo.png';
+import logoImage from '../../assets/MojoDojoLogoNoBackground.png';
 import jadImage from '../../assets/JadPicture.png';
 import eddyImage from '../../assets/EddyGPicture.png';
 import mikeImage from '../../assets/MikePicture.png';

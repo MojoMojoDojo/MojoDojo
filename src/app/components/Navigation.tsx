@@ -4,7 +4,7 @@ import { Menu, X, ShoppingBag } from 'lucide-react';
 import { Button } from './ui/button';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../contexts/LanguageContext';
-import logoImage from '../../assets/MojoDojoLogo.png';
+import logoImage from '../../assets/MojoDojoLogoNoBackground.png';
 
 export function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false);

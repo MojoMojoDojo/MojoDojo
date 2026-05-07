@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import { Instagram, Mail, MapPin, Phone } from 'lucide-react';
-import logoImage from '../../assets/MojoDojoLogo.png';
+import logoImage from '../../assets/MojoDojoLogoNoBackground.png';
 import { useLanguage } from '../contexts/LanguageContext';
 
 export function Footer() {
