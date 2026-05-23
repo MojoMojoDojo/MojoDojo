@@ -1,21 +1,49 @@
 import { Link } from 'react-router';
 import { ArrowRight, CheckCircle, ChevronDown, Clock, Instagram, ShoppingBag, Star } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import type { Product } from '../../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
+import heroChocolateDessert from '../../assets/homepage/heroChocolateDessert.jpg';
+import bakeryDisplayCase from '../../assets/homepage/bakeryDisplayCase.jpg';
+import cheesecake from '../../assets/homepage/cheesecake.jpg';
+import dimLitBakery from '../../assets/homepage/dimLitBakery.jpg';
+import hotChocolate from '../../assets/homepage/hotChocolate.jpg';
+import pie from '../../assets/homepage/pie.jpg';
+import sweetPastries from '../../assets/homepage/sweetPastries.jpg';
+import tiramisu from '../../assets/homepage/tiramisu.jpg';
 
 export function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeBackgroundIndex, setActiveBackgroundIndex] = useState(0);
   const { t } = useLanguage();
+
+  const heroBackgrounds = [
+    { src: heroChocolateDessert, alt: 'Premium chocolate dessert' },
+    { src: bakeryDisplayCase, alt: 'Bakery display case' },
+    { src: cheesecake, alt: 'Cheesecake dessert' },
+    { src: dimLitBakery, alt: 'Warm bakery interior' },
+    { src: hotChocolate, alt: 'Hot chocolate dessert' },
+    { src: pie, alt: 'Artisan pie dessert' },
+    { src: sweetPastries, alt: 'Sweet pastries assortment' },
+    { src: tiramisu, alt: 'Tiramisu dessert' },
+  ];
 
   useEffect(() => {
     loadProducts();
     initializeDatabase();
   }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setActiveBackgroundIndex((currentIndex) => (currentIndex + 1) % heroBackgrounds.length);
+    }, 11000);
+
+    return () => window.clearInterval(interval);
+  }, [heroBackgrounds.length]);
 
   async function initializeDatabase() {
     try {
@@ -41,13 +69,21 @@ export function HomePage() {
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden" data-page-section>
         {/* Background Image */}
-        <div className="absolute inset-0 z-0">
-          <img
-            src="https://images.unsplash.com/photo-1586195831800-24f14c992cea?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaG9jb2xhdGUlMjBkZXNzZXJ0JTIwbHV4dXJ5fGVufDF8fHx8MTc3MzIyMDk0Nnww&ixlib=rb-4.1.0&q=80&w=1080"
-            alt="Premium Desserts"
-            className="w-full h-full object-cover opacity-30"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-brand-black via-transparent to-brand-black"></div>
+        <div className="absolute inset-0 z-0 overflow-hidden">
+          <AnimatePresence initial={false} mode="wait">
+            <motion.img
+              key={heroBackgrounds[activeBackgroundIndex].src}
+              src={heroBackgrounds[activeBackgroundIndex].src}
+              alt={heroBackgrounds[activeBackgroundIndex].alt}
+              initial={{ opacity: 0, scale: 1.03 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.01 }}
+              transition={{ duration: 0.55, ease: 'easeOut' }}
+              className="absolute inset-0 h-full w-full object-cover object-center brightness-[0.55] contrast-[0.95]"
+            />
+          </AnimatePresence>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(0,0,0,0.18)_0%,_rgba(0,0,0,0.42)_52%,_rgba(0,0,0,0.86)_100%)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-brand-black/80 via-black/25 to-brand-black/88" />
         </div>
 
         <motion.a
@@ -89,8 +125,17 @@ export function HomePage() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
+            className="relative isolate mx-auto max-w-5xl px-6 py-8 sm:px-10 sm:py-10"
           >
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 premium-heading">
+            <h1
+              className="text-5xl md:text-7xl mb-6 premium-heading text-brand-off-white"
+              style={{
+                fontFamily: '"Playfair Display", Georgia, serif',
+                fontStyle: 'italic',
+                fontWeight: 700,
+                letterSpacing: '-0.03em',
+              }}
+            >
               {t.home.hero.title}
               <br />
               <span className="gold-accent">{t.home.hero.subtitle}</span>

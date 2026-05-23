@@ -30,8 +30,8 @@ export const fr: Translations = {
   },
   home: {
     hero: {
-      title: 'Desserts Premium,',
-      subtitle: 'Préparés avec Discipline',
+      title: 'Desserts Premium',
+      subtitle: 'Faits avec âme',
       description:
         'Découvrez des desserts et plateaux faits à la main avec précision, des ingrédients premium et un engagement sans faille envers la qualité. Livraison Montréal & Laval.',
       instagramCta: 'Notre Instagram',

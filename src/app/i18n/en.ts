@@ -28,8 +28,8 @@ export const en = {
   },
   home: {
     hero: {
-      title: 'Premium Desserts,',
-      subtitle: 'Crafted with Discipline',
+      title: 'Premium Desserts',
+      subtitle: 'Made with Soul',
       description:
         'Experience handcrafted desserts and trays made with precision, premium ingredients, and an unwavering commitment to quality. Montreal & Laval delivery.',
       instagramCta: 'Our Instagram',
