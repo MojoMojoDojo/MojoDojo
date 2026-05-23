@@ -70,7 +70,7 @@ export function HomePage() {
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden" data-page-section>
         {/* Background Image */}
         <div className="absolute inset-0 z-0 overflow-hidden">
-          <AnimatePresence initial={false} mode="wait">
+          <AnimatePresence initial={false} mode="sync">
             <motion.img
               key={heroBackgrounds[activeBackgroundIndex].src}
               src={heroBackgrounds[activeBackgroundIndex].src}
@@ -79,7 +79,7 @@ export function HomePage() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.01 }}
               transition={{ duration: 0.55, ease: 'easeOut' }}
-              className="absolute inset-0 h-full w-full object-cover object-center brightness-[0.55] contrast-[0.95]"
+              className="absolute inset-0 h-full w-full object-cover object-center brightness-[0.65] contrast-[0.96]"
             />
           </AnimatePresence>
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(0,0,0,0.18)_0%,_rgba(0,0,0,0.42)_52%,_rgba(0,0,0,0.86)_100%)]" />
@@ -130,15 +130,24 @@ export function HomePage() {
             <h1
               className="text-5xl md:text-7xl mb-6 premium-heading text-brand-off-white"
               style={{
-                fontFamily: '"Playfair Display", Georgia, serif',
-                fontStyle: 'italic',
-                fontWeight: 700,
+                fontFamily: 'inherit',
+                fontStyle: 'normal',
+                fontWeight: 400,
                 letterSpacing: '-0.03em',
               }}
             >
               {t.home.hero.title}
               <br />
-              <span className="gold-accent">{t.home.hero.subtitle}</span>
+              <span
+                className="gold-accent"
+                style={{
+                  fontFamily: '"Playfair Display", Georgia, serif',
+                  fontStyle: 'italic',
+                  fontWeight: 700,
+                }}
+              >
+                {t.home.hero.subtitle}
+              </span>
             </h1>
             
             <p className="text-xl md:text-2xl text-brand-light-gray mb-12 elegant-text max-w-3xl mx-auto">
