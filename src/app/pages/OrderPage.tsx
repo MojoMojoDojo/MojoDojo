@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Minus, ShoppingBag, AlertTriangle } from 'lucide-react';
+import { Plus, Minus, ShoppingBag, AlertTriangle, LockKeyhole } from 'lucide-react';
 import { api } from '../../lib/api';
 import type { Product } from '../../lib/supabase';
 import { toast } from 'sonner';
@@ -11,6 +11,8 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { getProductBasePriceFromCatalog } from '../lib/operationsCatalog';
 import { getAllergenTags, getLocalizedProductDescription, getLocalizedProductName } from '../lib/productContent';
 import { getProductImage } from '../lib/productImages';
+
+const ORDERING_CLOSED = true;
 
 export function OrderPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -30,6 +32,11 @@ export function OrderPage() {
     .filter(entry => entry.quantity > 0);
 
   useEffect(() => {
+    if (ORDERING_CLOSED) {
+      setLoading(false);
+      return;
+    }
+
     loadProducts();
   }, []);
 
@@ -46,7 +53,8 @@ export function OrderPage() {
   }
 
   return (
-    <div className="min-h-screen pt-20 pb-32 bg-brand-black">
+    <div className="relative min-h-screen pt-20 pb-32 bg-brand-black">
+      <div className={ORDERING_CLOSED ? 'blur-sm select-none pointer-events-none' : ''}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <motion.div
@@ -245,12 +253,36 @@ export function OrderPage() {
         )}
       </AnimatePresence>
 
+      </div>
+
       {/* Product Detail Modal */}
       <ProductDetailModal
         product={selectedProduct}
         isOpen={!!selectedProduct}
         onClose={() => setSelectedProduct(null)}
       />
+
+      {ORDERING_CLOSED && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/45 px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-lg rounded-xl border border-brand-gold/40 bg-zinc-950/95 p-8 text-center shadow-2xl shadow-black/50"
+          >
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full border border-brand-gold/50 bg-brand-gold/10">
+              <LockKeyhole className="h-7 w-7 text-brand-gold" />
+            </div>
+            <h2 className="text-2xl font-bold text-white">{t.order.temporarilyClosedTitle}</h2>
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="mt-6 rounded-lg bg-brand-gold px-5 py-3 text-sm font-semibold text-brand-black transition-opacity hover:opacity-90"
+            >
+              {t.order.returnHome}
+            </button>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

@@ -314,6 +314,9 @@ export const en = {
     items: (n: number) => `${n} item${n !== 1 ? 's' : ''}`,
     addedToCart: (name: string) => `${name} added!`,
     failedToLoad: 'Failed to load products',
+    temporarilyClosedTitle: 'Ordering is temporarily closed',
+    temporarilyClosedMessage: 'We are taking a short pause while we prepare the next batch. You can still browse the rest of MojoDojo and check back soon.',
+    returnHome: 'Return Home',
   },
   checkout: {
     title: 'Order',

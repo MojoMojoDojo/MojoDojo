@@ -316,6 +316,9 @@ export const fr: Translations = {
     items: (n: number) => `${n} article${n !== 1 ? 's' : ''}`,
     addedToCart: (name: string) => `${name} ajouté !`,
     failedToLoad: 'Impossible de charger les produits',
+    temporarilyClosedTitle: 'Les commandes sont temporairement fermées',
+    temporarilyClosedMessage: 'Nous faisons une courte pause pour préparer la prochaine production. Vous pouvez continuer à découvrir MojoDojo et revenir bientôt.',
+    returnHome: 'Retour à l’accueil',
   },
   checkout: {
     title: 'Demande',
